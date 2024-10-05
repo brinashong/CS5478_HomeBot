@@ -3,5 +3,5 @@
   url = https://github.com/aws-robotics/aws-robomaker-small-house-world.git
 [submodule "stretch_ros"]
   path = stretch_ros
-  url = https://github.com/brinashong/stretch_ros.git
+  url = git@github.com:brinashong/stretch_ros.git
   branch = brina
