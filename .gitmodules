@@ -1,3 +1,7 @@
 [submodule "aws-robomaker-small-house-world"]
-	path = aws-robomaker-small-house-world
-	url = https://github.com/aws-robotics/aws-robomaker-small-house-world.git
+  path = aws-robomaker-small-house-world
+  url = https://github.com/aws-robotics/aws-robomaker-small-house-world.git
+[submodule "stretch_ros"]
+  path = stretch_ros
+  url = https://github.com/brinashong/stretch_ros.git
+  branch = brina
