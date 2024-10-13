@@ -24,7 +24,7 @@ public:
   {
     IDLE,
     GO_TO_GOAL,
-    READY,
+    READY_FOR_TASK,
     GO_TO_OBJECT,
     PICK_OBJECT,
     GO_TO_TARGET_LOC,

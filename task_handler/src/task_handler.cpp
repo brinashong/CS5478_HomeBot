@@ -40,7 +40,7 @@ void TaskHandler::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& input
 {
   ROS_INFO_STREAM("New rviz goal received!");
 
-  if (curr_state_ == State::GO_TO_TARGET_LOC)
+  if (curr_state_ == State::GO_TO_TARGET_LOC || curr_state_ == State::GO_TO_OBJECT)
   {
     ac_->cancelAllGoals();
   }
@@ -58,7 +58,7 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
     switch (curr_state_)
     {
       case State::GO_TO_GOAL:
-        curr_state_ = State::READY;
+        curr_state_ = State::READY_FOR_TASK;
         break;
       case State::GO_TO_OBJECT:
         curr_state_ = State::PICK_OBJECT;
@@ -73,13 +73,13 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
   else
   {
     ROS_WARN_STREAM("Failed to reach the goal. Status: " << msg->status.status);
-    curr_state_ = IDLE;
+    curr_state_ = State::IDLE;
   }
 }
 
 void TaskHandler::objectPosesCallback(const task_handler::Objects::ConstPtr& msg)
 {
-  if (curr_state_ != State::READY)
+  if (curr_state_ != State::READY_FOR_TASK)
     return;
 
   ROS_INFO_STREAM("Object poses received!");
@@ -89,6 +89,7 @@ void TaskHandler::objectPosesCallback(const task_handler::Objects::ConstPtr& msg
 
   for (const auto& obj : msg->objects)
   {
+    ROS_INFO_STREAM("Adding " << obj.name << " to list");
     objects_.push(obj);
   }
 
@@ -154,5 +155,6 @@ void TaskHandler::placeObject()
   else
   {
     curr_state_ = State::IDLE;
+    ROS_INFO_STREAM("All tasks done!");
   }
 }
