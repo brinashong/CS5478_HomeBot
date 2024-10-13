@@ -1,0 +1,9 @@
+<library path="lib/librviz_homebot_panel">
+
+  <class type="rviz_panel::HomebotPanel" base_class_type="rviz::Panel">
+    <description>
+      A panel for the HomeBot mobile manipulator.
+    </description>
+  </class>
+
+</library>
