@@ -3,7 +3,12 @@
 
 #include <ros/ros.h>
 #include <rviz/panel.h>
+#include <ros/service_client.h>
+#include <std_srvs/SetBool.h>
+#include <std_msgs/String.h>
+#include <geometry_msgs/PoseStamped.h>
 
+#include <QString>
 #include <ui_homebot_panel.h>
 
 namespace rviz_panel
@@ -16,21 +21,30 @@ namespace rviz_panel
       explicit HomebotPanel(QWidget *parent = 0);
       ~HomebotPanel() {}
 
+      void stateCallback(const std_msgs::String::ConstPtr& input);
+      void taskCallback(const std_msgs::String::ConstPtr& input);
+      void goalCallback(const geometry_msgs::PoseStamped::ConstPtr& input);
+      bool resetCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+
       virtual void save(rviz::Config config) const;
       virtual void load(const rviz::Config &config);
 
       public Q_SLOTS:
 
       private Q_SLOTS:
-      // void button_one();
-      // void button_two();
+        void button();
 
     protected:
       std::shared_ptr<Ui::HomebotPanel> ui_;
       // ROS declaration
       ros::NodeHandle nh_;
-      // ros::Publisher button_1_pub_;
-      // ros::Publisher button_2_pub_;
+      ros::Subscriber state_sub_;
+      ros::Subscriber task_sub_;
+      ros::Subscriber goal_sub_;
+      ros::ServiceClient goal_srv_client_;
+      ros::ServiceServer reset_srv_server_;
+
+      bool sent_goal;
   };
 } // rviz_panel
 

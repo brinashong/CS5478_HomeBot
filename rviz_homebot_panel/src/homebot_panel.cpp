@@ -1,4 +1,5 @@
 #include "rviz_homebot_panel/homebot_panel.hpp"
+#include "std_srvs/SetBoolRequest.h"
 #include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS(rviz_panel::HomebotPanel, rviz::Panel)
@@ -12,28 +13,87 @@ namespace rviz_panel
     // Extend the widget with all attributes and children from UI file
     ui_->setupUi(this);
 
-    // Define ROS publisher
-    // button_1_pub_ = nh_.advertise<std_msgs::Bool>("button_1_topic", 1);
-    // button_2_pub_ = nh_.advertise<std_msgs::Bool>("button_2_topic", 1);
+    nh_ = ros::NodeHandle();
+    goal_srv_client_ = nh_.serviceClient<std_srvs::SetBool>("/homebot/goal_task");
 
-    // Declare ROS msg_
-    // msg_.data = true;
+    state_sub_ = nh_.subscribe<std_msgs::String>("/homebot/state", 1, [this](const std_msgs::String::ConstPtr& input){ this->stateCallback(input); });
+    task_sub_ = nh_.subscribe<std_msgs::String>("/homebot/task", 1, [this](const std_msgs::String::ConstPtr& input){ this->taskCallback(input); });
+    goal_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("/move_base_simple/goal", 1, [this](const geometry_msgs::PoseStamped::ConstPtr& input){ this->goalCallback(input); });
 
-    // connect(ui_->pushButton_1, SIGNAL(clicked()), this, SLOT(button_one()));
-    // connect(ui_->pushButton_2, SIGNAL(clicked()), this, SLOT(button_two()));
+    reset_srv_server_ = nh_.advertiseService("/homebot/reset", &HomebotPanel::resetCallback, this);
+
+    ui_->pushButton->setEnabled(false);
+
+    sent_goal = false;
+
+    connect(ui_->pushButton, SIGNAL(clicked()), this, SLOT(button()));
   }
 
-  // void simplePanel::button_one()
-  // {
-  //   ROS_INFO_STREAM("Button one pressed.");
-  //   this->button_1_pub_.publish(this->msg_);
-  // }
-  //
-  // void simplePanel::button_two()
-  // {
-  //   ROS_INFO_STREAM("Button two pressed.");
-  //   this->button_2_pub_.publish(this->msg_);
-  // }
+  void HomebotPanel::stateCallback(const std_msgs::String::ConstPtr& input)
+  {
+    ui_->state->setText(QString::fromStdString(input->data));
+  }
+
+  void HomebotPanel::taskCallback(const std_msgs::String::ConstPtr& input)
+  {
+    ui_->task->setText(QString::fromStdString(input->data));
+  }
+
+  void HomebotPanel::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& input)
+  {
+    ui_->pushButton->setEnabled(true);
+  }
+
+  bool HomebotPanel::resetCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res)
+  {
+    if (req.data)
+    {
+      ui_->pushButton->setText("Send");
+      ui_->pushButton->setEnabled(false);
+
+      res.success = true;
+      res.message = "reset";
+    }
+
+    return true;
+  }
+
+  void HomebotPanel::button()
+  {
+    std_srvs::SetBool srv;
+
+    // abort goal
+    if (sent_goal)
+    {
+      srv.request.data = false;
+
+      if (goal_srv_client_.call(srv) && srv.response.success)
+      {
+        ROS_INFO_STREAM("Result: " << srv.response.message);
+        sent_goal = false;
+        ui_->pushButton->setText("Send");
+      }
+      else
+      {
+        ROS_ERROR_STREAM("Failed to abort task!!!");
+      }
+    }
+    else // send goal
+    {
+      srv.request.data = true;
+
+      if (goal_srv_client_.call(srv) && srv.response.success)
+      {
+        ROS_INFO_STREAM("Result: " << srv.response.message);
+        sent_goal = true;
+        ui_->pushButton->setText("Abort");
+      }
+      else
+      {
+        ROS_ERROR_STREAM("Failed to send goal!!!");
+      }
+    }
+  }
 
   void HomebotPanel::save(rviz::Config config) const
   {

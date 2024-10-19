@@ -39,7 +39,7 @@
         </widget>
        </item>
        <item row="1" column="0">
-        <widget class="QLabel" name="task">
+        <widget class="QLabel" name="taskLabel">
          <property name="font">
           <font>
            <weight>75</weight>
@@ -52,7 +52,7 @@
         </widget>
        </item>
        <item row="1" column="1">
-        <widget class="QLabel" name="state_2">
+        <widget class="QLabel" name="task">
          <property name="text">
           <string>Inactive</string>
          </property>
@@ -64,9 +64,9 @@
       </layout>
      </item>
      <item row="1" column="0">
-      <widget class="QPushButton" name="abortButton">
+      <widget class="QPushButton" name="pushButton">
        <property name="text">
-        <string>Abort</string>
+        <string>Send</string>
        </property>
       </widget>
      </item>

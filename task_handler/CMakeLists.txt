@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   geometry_msgs
   move_base_msgs
+  visualization_msgs
   message_generation
 )
 
