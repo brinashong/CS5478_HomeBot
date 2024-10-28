@@ -14,19 +14,19 @@ if [ $? != 0 ]; then
   # gazebo nav
   tmux split-window -h -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'sleep 3; roslaunch stretch_navigation navigation_gazebo.launch gazebo_world:=/home/developer/mcomp_ws/src/CS5478_HomeBot/aws-robomaker-small-house-world/worlds/small_house.world map_yaml:=/home/developer/mcomp_ws/src/CS5478_HomeBot/aws-robomaker-small-house-world/maps/turtlebot3_waffle_pi/map.yaml' C-m
+  tmux send-keys -t stretch_sim 'sleep 3; roslaunch stretch_navigation navigation_gazebo.launch' C-m
   tmux select-layout tiled
 
   # moveit
   tmux split-window -v -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'sleep 10; roslaunch stretch_moveit_config demo_gazebo.launch'
+  tmux send-keys -t stretch_sim 'roslaunch stretch_moveit_config demo_gazebo.launch'
   tmux select-layout tiled
 
   # task handler
   tmux split-window -h -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'sleep 5; rosrun task_handler task_handler_node'
+  tmux send-keys -t stretch_sim 'rosrun task_handler task_handler_node'
   tmux select-layout tiled
 
 fi
