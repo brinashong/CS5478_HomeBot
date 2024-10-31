@@ -1,5 +1,4 @@
 #include "rviz_homebot_panel/homebot_panel.hpp"
-#include "std_srvs/SetBoolRequest.h"
 #include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS(rviz_panel::HomebotPanel, rviz::Panel)
