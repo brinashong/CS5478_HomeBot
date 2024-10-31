@@ -1,3 +1,4 @@
+#include "ros/spinner.h"
 #include "task_handler/task_handler.hpp"
 #include <memory>
 
@@ -8,7 +9,8 @@ int main(int argc, char** argv)
 
   std::shared_ptr<TaskHandler> obj = std::make_shared<TaskHandler>(nh, pnh);
 
-  ros::spin();
+  ros::MultiThreadedSpinner spinner(2);
+  spinner.spin();
 
   return 0;
 }

@@ -7,6 +7,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  moveit_core
+  moveit_ros_planning_interface
   actionlib
   geometry_msgs
   move_base_msgs

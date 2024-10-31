@@ -1,12 +1,22 @@
 #include "task_handler/task_handler.hpp"
-#include "ros/init.h"
-#include "std_srvs/SetBoolRequest.h"
-#include "std_srvs/SetBoolResponse.h"
-#include "visualization_msgs/Marker.h"
 
 TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
-  : nh_{nh}
+  : nh_{nh},
+    arm_group_{"stretch_arm"},
+    gripper_group_{"stretch_gripper"}
 {
+  arm_group_.setGoalPositionTolerance(0.1);
+  arm_group_.setGoalOrientationTolerance(0.1);
+  arm_group_.setGoalJointTolerance(0.001);
+  // arm_group_.setPlannerId("RRTConnectkConfigDefault");
+  arm_group_.setPlanningTime(10.0);
+
+  gripper_group_.setGoalPositionTolerance(0.001);
+  gripper_group_.setGoalOrientationTolerance(0.01);
+  gripper_group_.setGoalJointTolerance(0.001);
+  gripper_group_.setPlannerId("TRRT");
+  gripper_group_.setPlanningTime(10.0);
+
   goal_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("/move_base_simple/goal", 1, [this](const geometry_msgs::PoseStamped::ConstPtr& input){ this->goalCallback(input); });
   result_sub_ = nh_.subscribe<move_base_msgs::MoveBaseActionResult>("/move_base/result", 1, [this](const move_base_msgs::MoveBaseActionResult::ConstPtr& msg){ this->mbResultCallback(msg); });
   object_poses_sub_ = nh_.subscribe<task_handler::Objects>("/object_poses", 1, [this](const task_handler::Objects::ConstPtr& msg){ this->objectPosesCallback(msg); });
@@ -30,12 +40,14 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   geometry_msgs::Pose pose;
   pose.position.x = 7.78;
   pose.position.y = -4.22;
+  pose.position.z = 1.5;
   pose.orientation.z = -0.7;
   pose.orientation.w = 0.71;
   target_loc_map_["sink"] = pose;
 
   pose.position.x = 4.3;
   pose.position.y = -4.68;
+  pose.position.z = 1.5;
   pose.orientation.z = -0.7;
   pose.orientation.w = 0.71;
   target_loc_map_["shelf"] = pose;
@@ -204,6 +216,19 @@ void TaskHandler::pickObject()
   ROS_INFO_STREAM("Picking up object");
 
   // TODO: send moveit pick task
+  moveArm(1.18, -0.2);
+
+  // open the gripper
+  moveGripper("open");
+
+  // move the TCP close to the object
+  moveArm(1.0, -0.2);
+
+  // close the gripper
+  moveGripper("closed");
+
+  // TODO: lift it up a bit
+  moveArm(1.18, -0.2);
 
   // once done picking
   curr_state_ = State::GO_TO_TARGET_LOC;
@@ -234,6 +259,18 @@ void TaskHandler::placeObject()
   ROS_INFO_STREAM("Placing object");
 
   // TODO: send moveit place task
+  // Move the TCP above the plate 
+  auto curr_pose = arm_group_.getCurrentPose(arm_group_.getEndEffectorLink());
+  moveArm(curr_pose.pose.position.z + 0.2, curr_pose.pose.position.y);
+
+  // Lower the TCP above the plate
+  moveArm(curr_pose.pose.position.z - 0.2, curr_pose.pose.position.y);
+
+  // Open the gripper
+  moveGripper("open");
+
+  // TODO: lift the arm a bit
+  moveArm(curr_pose.pose.position.z + 0.2, curr_pose.pose.position.y);
 
   // once done placing
   objects_.pop();
@@ -263,4 +300,70 @@ void TaskHandler::placeObject()
       rate.sleep();
     }
   }
+}
+
+void TaskHandler::moveArm(const double height, const double depth)
+{
+  auto curr_pose = arm_group_.getCurrentPose(arm_group_.getEndEffectorLink());
+
+  geometry_msgs::Pose target_pose = curr_pose.pose;
+  target_pose.position.x = 0.0;
+  target_pose.position.y = depth;
+  target_pose.position.z = height;
+  target_pose.orientation.x = 0.0;
+  target_pose.orientation.y = 0.0;
+  target_pose.orientation.z = 0.7071;
+  target_pose.orientation.w = 0.7071;
+
+  arm_group_.setStartStateToCurrentState();  
+  arm_group_.setApproximateJointValueTarget(poseMsgToEigen(target_pose), arm_group_.getEndEffectorLink());
+
+  moveit::planning_interface::MoveGroupInterface::Plan plan;
+  bool success = (arm_group_.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+  if (success)
+  {
+    ROS_INFO("Executing arm movement...");
+    arm_group_.execute(plan);
+  }
+  else
+  {
+    ROS_WARN("Arm movement planning failed.");
+  }
+}
+
+void TaskHandler::moveGripper(const std::string& target)
+{
+  moveit::planning_interface::MoveGroupInterface::Plan plan;
+  gripper_group_.setJointValueTarget(gripper_group_.getNamedTargetValues(target));
+
+  bool success = (gripper_group_.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+  if (success)
+  {
+    ROS_INFO("Executing gripper movement...");
+    gripper_group_.execute(plan);
+  }
+  else
+  {
+    ROS_WARN("Gripper movement planning failed.");
+  }
+}
+
+Eigen::Isometry3d TaskHandler::poseMsgToEigen(const geometry_msgs::Pose& msg)
+{
+  Eigen::Isometry3d approx_target;
+  Eigen::Translation3d translation(msg.position.x, msg.position.y, msg.position.z);
+  Eigen::Quaterniond quaternion(msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z);
+  if ((quaternion.x() == 0) && (quaternion.y() == 0) && (quaternion.z() == 0) && (quaternion.w() == 0))
+  {
+    ROS_WARN("Empty quaternion found in pose message. Setting to neutral orientation.");
+    quaternion.setIdentity();
+  }
+  else
+  {
+    quaternion.normalize();
+  }
+  approx_target = translation * quaternion;
+  return approx_target;
 }

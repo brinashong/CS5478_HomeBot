@@ -7,6 +7,9 @@
 #include <unordered_map>
 
 #include <ros/ros.h>
+#include <ros/service_server.h>
+#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <actionlib/client/simple_action_client.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -17,7 +20,6 @@
 #include <std_msgs/String.h>
 #include <visualization_msgs/Marker.h>
 
-#include "ros/service_server.h"
 #include "task_handler/Object.h"
 #include "task_handler/Objects.h"
 
@@ -46,6 +48,9 @@ private:
   void sendObjectGoal();
   void pickObject();
   void placeObject();
+  void moveArm(const double height, const double depth);
+  void moveGripper(const std::string& target);
+  Eigen::Isometry3d poseMsgToEigen(const geometry_msgs::Pose& msg);
 
   ros::NodeHandle nh_;
   ros::Subscriber goal_sub_;
@@ -57,6 +62,7 @@ private:
   ros::ServiceClient reset_srv_client_;
   ros::ServiceServer goal_srv_server_;
   std::unique_ptr<actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>> ac_;
+  moveit::planning_interface::MoveGroupInterface arm_group_, gripper_group_;
 
   State curr_state_;
   std_msgs::String state_str_;
