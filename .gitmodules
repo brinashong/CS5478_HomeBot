@@ -8,3 +8,6 @@
 [submodule "realsense_gazebo_plugin"]
 	path = realsense_gazebo_plugin
 	url = git@github.com:pal-robotics/realsense_gazebo_plugin.git
+[submodule "gazebo_models_worlds_collection"]
+	path = gazebo_models_worlds_collection
+	url = git@github.com:leonhartyao/gazebo_models_worlds_collection.git
