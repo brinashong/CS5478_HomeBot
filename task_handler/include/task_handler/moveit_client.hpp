@@ -57,8 +57,8 @@ namespace moveit_control
     void moveZWithCurrentPose(const double z);
 
     /**
-     * \brief move to pose with end efferctor link
-     *  contrainted to its current pose
+     * \brief move to pose with end effector link
+     *  constrained to its current pose
      *
      * \param x axis value
      * \param y axis value
