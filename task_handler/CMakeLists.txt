@@ -12,6 +12,14 @@ find_package(catkin REQUIRED COMPONENTS
   move_base_msgs
   visualization_msgs
   message_generation
+  moveit_core
+  moveit_ros_planning
+  moveit_ros_planning_interface
+  geometric_shapes
+  moveit_visual_tools
+  tf2_ros
+  tf2_eigen
+  tf2_geometry_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -150,6 +158,15 @@ add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catk
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
   ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+)
+
+# MoveIt Client
+add_executable(moveit_client_node
+./src/moveit_client.cpp
+./src/moveit_client_node.cpp
+)
+target_link_libraries(moveit_client_node
   ${catkin_LIBRARIES}
 )
 
