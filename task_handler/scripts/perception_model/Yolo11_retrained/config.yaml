@@ -1,0 +1,11 @@
+path: /content/drive/MyDrive/claudiaYao - Colab Notebooks/Yolo_v8/dataset
+train: images/train
+val: images/val
+
+names:
+    0: table
+    1: rubbish_bin
+    2: book
+    3: can
+    4: cup
+    5: book_shelf
