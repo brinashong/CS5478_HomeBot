@@ -14,13 +14,13 @@ if [ $? != 0 ]; then
   # gazebo nav
   tmux split-window -h -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'sleep 3; roslaunch stretch_navigation navigation_gazebo.launch' C-m
+  tmux send-keys -t stretch_sim 'sleep 3; roslaunch stretch_navigation navigation_gazebo_robotiq.launch' C-m
   tmux select-layout tiled
 
   # moveit
   tmux split-window -v -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'roslaunch stretch_moveit_config demo_gazebo.launch'
+  tmux send-keys -t stretch_sim 'roslaunch stretch_robotiq_moveit_config demo_gazebo.launch'
   tmux select-layout tiled
 
   # task handler
