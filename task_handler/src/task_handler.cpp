@@ -3,7 +3,8 @@
 TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   : nh_{nh},
     arm_group_{"stretch_arm"},
-    gripper_group_{"stretch_gripper"}
+    gripper_group_{"stretch_gripper"},
+    tf2_listener{tf2_buffer}
 {
   arm_group_.setGoalPositionTolerance(0.1);
   arm_group_.setGoalOrientationTolerance(0.1);
@@ -36,21 +37,31 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
 
   object_loc_map_["cup"] = "sink";
   object_loc_map_["book"] = "shelf";
+  object_loc_map_["can"] = "bin";
 
   geometry_msgs::Pose pose;
-  pose.position.x = 7.78;
-  pose.position.y = -4.22;
+  pose.position.x = 8.2;
+  pose.position.y = -4.35;
   pose.position.z = 1.5;
   pose.orientation.z = -0.7;
   pose.orientation.w = 0.71;
   target_loc_map_["sink"] = pose;
 
-  pose.position.x = 4.3;
-  pose.position.y = -4.68;
-  pose.position.z = 1.5;
+  pose.position.x = 4.32;
+  pose.position.y = -4.55;
+  pose.position.z = 1.2;
   pose.orientation.z = -0.7;
   pose.orientation.w = 0.71;
   target_loc_map_["shelf"] = pose;
+
+  pose.position.x = 2.82;
+  pose.position.y = -0.78;
+  pose.position.z = 0.5;
+  pose.orientation.x = 0.0;
+  pose.orientation.y = 1.0;
+  pose.orientation.z = 0.0;
+  pose.orientation.w = 0.0;
+  target_loc_map_["bin"] = pose;
 
   curr_state_ = State::IDLE;
   state_str_.data = "Idle";
@@ -215,20 +226,23 @@ void TaskHandler::pickObject()
 {
   ROS_INFO_STREAM("Picking up object");
 
-  // TODO: send moveit pick task
-  moveArm(1.18, -0.2);
+  auto object = objects_.front();
+
+  // move TCP to above object
+  auto pose_in_base_link = poseInBaseLink(object.pose);
+  moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
 
   // open the gripper
   moveGripper("open");
 
   // move the TCP close to the object
-  moveArm(1.0, -0.2);
+  moveArm(pose_in_base_link.pose.position.z, pose_in_base_link.pose.position.y);
 
   // close the gripper
   moveGripper("closed");
 
   // TODO: lift it up a bit
-  moveArm(1.18, -0.2);
+  moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
 
   // once done picking
   curr_state_ = State::GO_TO_TARGET_LOC;
@@ -258,19 +272,20 @@ void TaskHandler::placeObject()
 {
   ROS_INFO_STREAM("Placing object");
 
-  // TODO: send moveit place task
-  // Move the TCP above the plate 
-  auto curr_pose = arm_group_.getCurrentPose(arm_group_.getEndEffectorLink());
-  moveArm(curr_pose.pose.position.z + 0.2, curr_pose.pose.position.y);
+  auto target_pose = target_loc_map_[objects_.front().name];
 
-  // Lower the TCP above the plate
-  moveArm(curr_pose.pose.position.z - 0.2, curr_pose.pose.position.y);
+  // Move the TCP above
+  auto pose_in_base_link = poseInBaseLink(target_pose);
+  moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
+
+  // Lower the TCP
+  moveArm(pose_in_base_link.pose.position.z, pose_in_base_link.pose.position.y);
 
   // Open the gripper
   moveGripper("open");
 
-  // TODO: lift the arm a bit
-  moveArm(curr_pose.pose.position.z + 0.2, curr_pose.pose.position.y);
+  // lift the arm a bit
+  moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
 
   // once done placing
   objects_.pop();
@@ -304,16 +319,16 @@ void TaskHandler::placeObject()
 
 void TaskHandler::moveArm(const double height, const double depth)
 {
-  auto curr_pose = arm_group_.getCurrentPose(arm_group_.getEndEffectorLink());
+  // auto curr_pose = arm_group_.getCurrentPose(arm_group_.getEndEffectorLink());
 
-  geometry_msgs::Pose target_pose = curr_pose.pose;
+  geometry_msgs::Pose target_pose; // = curr_pose.pose;
   target_pose.position.x = 0.0;
   target_pose.position.y = depth;
   target_pose.position.z = height;
-  target_pose.orientation.x = 0.0;
+  target_pose.orientation.x = 1.0;
   target_pose.orientation.y = 0.0;
-  target_pose.orientation.z = 0.7071;
-  target_pose.orientation.w = 0.7071;
+  target_pose.orientation.z = 0.0;
+  target_pose.orientation.w = 0.0;
 
   arm_group_.setStartStateToCurrentState();  
   arm_group_.setApproximateJointValueTarget(poseMsgToEigen(target_pose), arm_group_.getEndEffectorLink());
@@ -366,4 +381,30 @@ Eigen::Isometry3d TaskHandler::poseMsgToEigen(const geometry_msgs::Pose& msg)
   }
   approx_target = translation * quaternion;
   return approx_target;
+}
+
+geometry_msgs::PoseStamped TaskHandler::poseInBaseLink(const geometry_msgs::Pose& pose)
+{
+  // transform from map to baselink frame
+  geometry_msgs::PoseStamped pose_in_map;
+  pose_in_map.header.frame_id = "map";
+  pose_in_map.header.stamp = ros::Time(0);
+  pose_in_map.pose = pose;
+
+  geometry_msgs::PoseStamped pose_in_base_link;
+
+  try
+  {
+    tf2_buffer.canTransform("base_link", "map", ros::Time(0), ros::Duration(3.0));
+
+    pose_in_base_link = tf2_buffer.transform(pose_in_map, "base_link");
+
+    ROS_INFO_STREAM("Transformed Pose: " << pose_in_base_link);
+  }
+  catch (tf2::TransformException &ex)
+  {
+    ROS_WARN("Could not transform pose: %s", ex.what());
+  }
+
+  return pose_in_base_link;
 }
