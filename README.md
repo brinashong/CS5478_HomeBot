@@ -17,7 +17,7 @@ rosrun task_handler stretch_image_capture.py
 rosrun task_handler stretch_location_publisher.py
 ```
 
-3. Useful Information</br>
+# Useful Information</br>
 - node stretch_image_capture will generate two folders under task_handler folder. 
     a. `images` folder - store RGB images
     b. `depth_images` folder - store depth info of the RGB images (with the same index in file name)
