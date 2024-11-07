@@ -36,3 +36,61 @@ rosrun task_handler stretch_location_publisher.py
 
     - Yolo11_retrained </br>
     This folder contains Yolo11 retrained model. Same retraining process as Yolo8 retrained model. Compared to Yolo8 retrained model, its performance and precision both improve. We are using this model to identify objects.
+
+# Publish object ground truth poses
+rostopic pub /object_poses task_handler/Objects "objects:
+- name: 'can'
+  pose:
+    position:
+      x: 2.85
+      y: -1.51
+      z: 0.37
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 1.0
+      w: 0.0" 
+- name: 'can'
+  pose:
+    position:
+      x: 2.08
+      y: -1.63
+      z: 0.37
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 0.0" 
+- name: 'cup'
+  pose:
+    position:
+      x: 2.07
+      y: -1.89
+      z: 0.37
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 0.0" 
+- name: 'book'
+  pose:
+    position:
+      x: 5.74
+      y: 0.92
+      z: 0.80
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 0.0" 
+- name: 'book'
+  pose:
+    position:
+      x: 5.70
+      y: 1.03
+      z: 0.80
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 0.0" 
