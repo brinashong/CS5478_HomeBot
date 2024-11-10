@@ -22,6 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   tf2_eigen
   tf2_geometry_msgs
+  gazebo_ros_link_attacher
 )
 
 ## System dependencies are found with CMake's conventions

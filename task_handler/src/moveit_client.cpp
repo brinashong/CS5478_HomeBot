@@ -1,6 +1,6 @@
 #include "task_handler/moveit_client.hpp"
-#include "moveit_msgs/Constraints.h"
-#include "moveit_msgs/OrientationConstraint.h"
+#include "moveit_msgs/AttachedCollisionObject.h"
+#include "ros/console.h"
 
 namespace moveit_control
 {
@@ -43,6 +43,12 @@ namespace moveit_control
     control_->setPlanningTime(planning_time_);
     control_->setPlannerId("RRTConnect");
 
+    gz_get_client_ = n_.serviceClient<gazebo_msgs::GetModelState>("/gazebo/get_model_state");
+    gz_set_client_ = n_.serviceClient<gazebo_msgs::SetModelState>("/gazebo/set_model_state");
+
+    attach_gz_client_ = n_.serviceClient<gazebo_ros_link_attacher::Attach>("/link_attacher_node/attach");
+    detach_gz_client_ = n_.serviceClient<gazebo_ros_link_attacher::Attach>("/link_attacher_node/detach");
+
     initialize_ = true;
   }
 
@@ -54,6 +60,299 @@ namespace moveit_control
       return false;
     }
     return true;
+  }
+
+  bool MoveItClient::addCollision(const moveit_msgs::CollisionObject& _collision_object)
+  {
+    if (!initCheck()) return false;
+
+    if (planning_scene_pub_.getNumSubscribers() == 0u)
+    {
+      ROS_WARN_STREAM(__func__ << ": Planning scene not available, please try again later.");
+      return false;
+    }
+
+    std::vector<moveit_msgs::CollisionObject> collision_objects;
+    auto collision_object = _collision_object;
+    collision_object.operation = collision_object.ADD;
+    collision_objects.push_back(collision_object);
+    // planning_scene_interface_.addCollisionObjects(_collision_objects);
+    planning_scene_interface_.applyCollisionObjects(collision_objects);
+
+    std::cout << "Adding object " << collision_object.id
+      << " to planning scence" << std::endl;
+
+    // Debug
+    std::cout << "Know Objects: ";
+    for (const auto& obj_name : planning_scene_interface_.getKnownObjectNames())
+    {
+      std::cout << obj_name << ", ";
+    }
+    std::cout << std::endl;
+
+    return true;
+  }
+
+  bool MoveItClient::addCollisions(const std::vector<moveit_msgs::CollisionObject>& _collision_objects)
+  {
+    if (!initCheck()) return false;
+
+    if (planning_scene_pub_.getNumSubscribers() == 0u)
+    {
+      ROS_WARN_STREAM(__func__ << ": Planning scene not available, please try again later.");
+      return false;
+    }
+
+    std::vector<moveit_msgs::CollisionObject> collision_objects;
+    collision_objects = _collision_objects;
+    // planning_scene_interface_.addCollisionObjects(collision_objects);
+    planning_scene_interface_.applyCollisionObjects(collision_objects);
+
+    // Debug
+    std::cout << "Know Objects: ";
+    for (const auto& obj_name : planning_scene_interface_.getKnownObjectNames())
+    {
+      std::cout << obj_name << ", ";
+    }
+    std::cout << std::endl;
+
+    return true;
+  }
+
+  bool MoveItClient::removeCollision(const std::string& target)
+  {
+    if (!initCheck()) return false;
+
+    if (planning_scene_pub_.getNumSubscribers() == 0u)
+    {
+      ROS_WARN_STREAM(__func__ << ": Planning scene not available, please try again later.");
+      return false;
+    }
+
+    // planning_scene_interface_.removeCollisionObjects({target});
+    moveit_msgs::CollisionObject collision_object;
+    collision_object.id = target;
+    collision_object.operation = collision_object.REMOVE;
+    planning_scene_interface_.applyCollisionObjects({collision_object});
+
+    std::cout << "Removing collision object "
+      << collision_object.id << " from planning scene." << std::endl;
+
+    return true;
+  }
+
+  bool MoveItClient::clearCollisions()
+  {
+    if (!initCheck()) return false;
+
+    if (planning_scene_pub_.getNumSubscribers() == 0u)
+    {
+      ROS_WARN_STREAM(__func__ << ": Planning scene not available, please try again later.");
+      return false;
+    }
+
+    // Woah!
+    planning_scene_interface_.clear();
+
+    // // Ensures all objects are retrieved, typed or untyped.
+    // auto ids = planning_scene_interface_.getKnownObjectNames(false);
+    //
+    // std::vector<moveit_msgs::CollisionObject> collision_objects;
+    // for (const auto& id : ids)
+    // {
+    //   moveit_msgs::CollisionObject collision_object;
+    //   collision_object.id = id;
+    //   collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
+    //   collision_objects.push_back(collision_object);
+    // }
+    //
+    // planning_scene_interface_.applyCollisionObjects(collision_objects);
+    // std::cout << "All collision objects removed using applyCollisionObjects."
+    //   << std::endl;
+
+    ROS_INFO_STREAM(__func__ << ": All collision and attached objects have been removed"
+        " from planning scene.");
+
+    return true;
+  }
+
+  bool MoveItClient::attachObject(const std::string& _object_name,
+        const moveit_msgs::AttachedCollisionObject& _attached_object,
+        const std::string& _group_name
+      )
+  {
+    if (!initCheck()) return false;
+
+    if (planning_scene_pub_.getNumSubscribers() == 0u)
+    {
+      ROS_WARN_STREAM(__func__ << ": Planning scene not available, please try again later.");
+      return false;
+    }
+
+    // Step 0: Prep attach object
+    moveit_msgs::AttachedCollisionObject attach_object = _attached_object;
+    attach_object.link_name = end_effector_link_;
+    attach_object.object.header.frame_id = control_->getPlanningFrame();
+    attach_object.object.operation = moveit_msgs::CollisionObject::ADD;
+
+    // Step 1: Add collision object in planning scene
+    addCollision(attach_object.object);
+
+    // Step 2: Attach collision object to gripper
+    // Sanity check whether step 1 was successful
+    if (auto ids = planning_scene_interface_.getKnownObjectNames(false);
+        std::find(ids.begin(), ids.end(), attach_object.object.id) != ids.end())
+    {
+      if (planning_scene_interface_.applyAttachedCollisionObject(attach_object))
+      {
+        ROS_INFO_STREAM(__func__ << ": Successfully attached object to end effector link.");
+        return true;
+      }
+      else
+      {
+        ROS_WARN_STREAM(__func__ << ": Failed to attach object to end effector link.");
+        return false;
+      }
+    }
+    else
+    {
+      ROS_WARN_STREAM(__func__ << ": Failed to find collision object before attaching.");
+      return false;
+    }
+  }
+
+  bool MoveItClient::detachObject(const std::string& id)
+  {
+    if (!initCheck()) return false;
+
+    if (planning_scene_pub_.getNumSubscribers() == 0u)
+    {
+      ROS_WARN_STREAM(__func__ << ": Planning scene not available, please try again later.");
+      return false;
+    }
+
+    // Step 0: Prep detach object
+    moveit_msgs::AttachedCollisionObject detach_object;
+    detach_object.object.id = id;
+    detach_object.link_name = end_effector_link_;
+    detach_object.object.header.frame_id = control_->getPlanningFrame();
+    detach_object.object.operation = moveit_msgs::CollisionObject::REMOVE;
+
+    // Step 1: remove attached object
+    planning_scene_interface_.applyAttachedCollisionObject(detach_object);
+
+    // Step 2: remove collision object from scene
+    removeCollision(id);
+
+    return true;
+  }
+
+  bool MoveItClient::attachGazeboModel(const std::string& object_id)
+  {
+    if (!initCheck()) return false;
+
+    gazebo_ros_link_attacher::Attach attach_msg;
+    attach_msg.request.model_name_1 = "robot";
+    attach_msg.request.link_name_1 = "att_link";
+
+    attach_msg.request.model_name_2 = object_id;
+    attach_msg.request.link_name_2 = "att_link";
+
+    // Call attach service
+    if (attach_gz_client_.call(attach_msg))
+    {
+      ROS_INFO_STREAM(__func__ << ": Model " << object_id << " attached!");
+      return true;
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to call attach service");
+      return false;
+    }
+  }
+
+  bool MoveItClient::detachGazeboModel(const std::string& object_id)
+  {
+    if (!initCheck()) return false;
+
+    gazebo_ros_link_attacher::Attach attach_msg;
+    attach_msg.request.model_name_1 = "robot";
+    attach_msg.request.link_name_1 = "att_link";
+
+    attach_msg.request.model_name_2 = object_id;
+    attach_msg.request.link_name_2 = "att_link";
+
+    // Call detach service
+    if (detach_gz_client_.call(attach_msg))
+    {
+      ROS_INFO_STREAM(__func__ << ": Model " << object_id << " attached!");
+      return true;
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to call attach service");
+      return false;
+    }
+  }
+
+  std::optional<geometry_msgs::Pose> MoveItClient::getGazeboModelPose(const std::string& object_id)
+  {
+    gazebo_msgs::GetModelState model_state_msg;
+    model_state_msg.request.model_name = object_id;
+
+    // Call get gazebo model service
+    if (gz_get_client_.call(model_state_msg))
+    {
+      if (model_state_msg.response.success)
+      {
+        ROS_INFO_STREAM(__func__ << ": Model " << object_id << " pose obtained!");
+        return {model_state_msg.response.pose};
+      }
+      else
+      {
+        ROS_ERROR_STREAM(__func__ << ": Failed to find model "
+            << object_id);
+        return {};
+      }
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to call Gazebo get models service");
+      return {};
+    }
+  }
+
+  bool MoveItClient::setGazeboModelPose(
+      const std::string& object_id,
+      const geometry_msgs::Pose& pose,
+      const std::string& ref_frame
+    )
+  {
+    gazebo_msgs::SetModelState mode_state_msg;
+    mode_state_msg.request.model_state.model_name = object_id;
+    mode_state_msg.request.model_state.pose = pose;
+    mode_state_msg.request.model_state.reference_frame = ref_frame;
+
+    // Call set gazebo model service
+    if (gz_set_client_.call(mode_state_msg))
+    {
+      if (mode_state_msg.response.success)
+      {
+        ROS_INFO_STREAM(__func__ << ": Setting model " << object_id << " pose!");
+        return true;
+      }
+      else
+      {
+        ROS_ERROR_STREAM(__func__ << ": Failed to set model "
+            << object_id << " pose!");
+        return false;
+      }
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to call Gazebo set models service");
+      return false;
+    }
   }
 
   void MoveItClient::goPreset(const std::string& target)

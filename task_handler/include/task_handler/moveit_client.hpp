@@ -1,9 +1,8 @@
 #pragma once
 
 // ROS
-#include "moveit_msgs/Constraints.h"
-#include "moveit_msgs/OrientationConstraint.h"
 #include <ros/ros.h>
+#include <geometry_msgs/Pose.h>
 
 // MoveIt
 #include <moveit/move_group_interface/move_group_interface.h>
@@ -15,9 +14,17 @@
 #include <string>
 #include <tf2/LinearMath/Quaternion.h>
 
+// Gazebo
+#include <gazebo_msgs/ModelState.h>
+#include <gazebo_msgs/GetModelState.h>
+#include <gazebo_msgs/SetModelState.h>
+#include <gazebo_ros_link_attacher/Attach.h>
+
+
 // STL
 #include <memory>
 #include <vector>
+#include <optional>
 #include <chrono>
 #include <thread>
 #include <algorithm>
@@ -32,6 +39,45 @@ namespace moveit_control
         std::shared_ptr<moveit::planning_interface::MoveGroupInterface> control,
         const std::string& planning_group,
         std::vector<moveit_msgs::JointConstraint> default_joint_contraints = {});
+
+    bool addCollision(const moveit_msgs::CollisionObject& collision_object);
+
+    bool addCollisions(const std::vector<moveit_msgs::CollisionObject>& collision_objects);
+
+    bool removeCollision(const std::string& id);
+
+    bool clearCollisions();
+
+    bool attachObject(const std::string& _object_name,
+        const moveit_msgs::AttachedCollisionObject& _attached_object,
+        const std::string& _group_name
+      );
+
+    bool detachObject(const std::string& id);
+
+    /**
+     * \brief Attach Gazebo model to end effector
+     */
+    bool attachGazeboModel(const std::string& object_id);
+
+    /**
+     * \brief Detach Gazebo model from end effector
+     */
+    bool detachGazeboModel(const std::string& object_id);
+
+    /**
+     * \brief Get Gazebo model pose
+     */
+    std::optional<geometry_msgs::Pose> getGazeboModelPose(const std::string& object_id);
+
+    /**
+     * \brief Set Gazebo model pose
+     */
+    bool setGazeboModelPose(
+        const std::string& object_id,
+        const geometry_msgs::Pose& pose,
+        const std::string& ref_frame
+      );
 
     void goPreset(const std::string& target);
 
@@ -96,6 +142,11 @@ namespace moveit_control
     ros::Publisher planning_scene_pub_;
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
     std::vector<moveit_msgs::JointConstraint> default_joint_contraints_;
+
+    ros::ServiceClient gz_get_client_;
+    ros::ServiceClient gz_set_client_;
+    ros::ServiceClient attach_gz_client_;
+    ros::ServiceClient detach_gz_client_;
 
     bool initialize_;
     double position_tolerance_;
