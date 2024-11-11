@@ -1,4 +1,5 @@
 #include "task_handler/moveit_client.hpp"
+#include "geometry_msgs/PoseStamped.h"
 #include "moveit_msgs/AttachedCollisionObject.h"
 #include "ros/console.h"
 
@@ -22,6 +23,8 @@ namespace moveit_control
     , reference_frame_{"base_link"}
     , planning_time_{10.0}
     , joint_model_group_(control_->getCurrentState()->getJointModelGroup(planning_group))
+    , tf_buffer_{std::make_unique<tf2_ros::Buffer>()}
+    , transform_listener_{std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)}
   {
     control_->setGoalPositionTolerance(position_tolerance_);
     control_->setGoalOrientationTolerance(orientation_tolerance_);
@@ -312,13 +315,13 @@ namespace moveit_control
       {
         ROS_ERROR_STREAM(__func__ << ": Failed to find model "
             << object_id);
-        return {};
+        return std::nullopt;
       }
     }
     else
     {
       ROS_ERROR_STREAM(__func__ << ": Failed to call Gazebo get models service");
-      return {};
+      return std::nullopt;
     }
   }
 
@@ -353,6 +356,28 @@ namespace moveit_control
       ROS_ERROR_STREAM(__func__ << ": Failed to call Gazebo set models service");
       return false;
     }
+  }
+
+  std::optional<geometry_msgs::PoseStamped> MoveItClient::getPoseInGivenFrame(
+      const std::string& target_frame,
+      const geometry_msgs::PoseStamped& pose
+      )
+  {
+    if (!initCheck()) return std::nullopt;
+
+    try
+    {
+      auto transform = tf_buffer_->lookupTransform(
+          target_frame, pose.header.frame_id, ros::Time(0));
+
+        geometry_msgs::PoseStamped pose_in_target_frame;
+        tf2::doTransform(pose_in_source_frame, pose_in_target_frame, transform);
+    }
+    catch (const std::exception &e)
+    {
+      std::cout << "message" << std::endl;
+      return std::nullopt;
+    };
   }
 
   void MoveItClient::goPreset(const std::string& target)

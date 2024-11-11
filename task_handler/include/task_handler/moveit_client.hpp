@@ -1,7 +1,9 @@
 #pragma once
 
 // ROS
+#include "geometry_msgs/PoseStamped.h"
 #include <ros/ros.h>
+#include <tf2_ros/transform_listener.h>
 #include <geometry_msgs/Pose.h>
 
 // MoveIt
@@ -79,6 +81,19 @@ namespace moveit_control
         const std::string& ref_frame
       );
 
+    /**
+     * \brief Transform pose to given frame
+     */
+    std::optional<geometry_msgs::PoseStamped> getPoseInGivenFrame(
+        const std::string& frame,
+        const geometry_msgs::PoseStamped& pose
+      );
+
+    /**
+     * \brief Transform pose to planning frame
+     */
+    std::optional<geometry_msgs::PoseStamped> getPoseInPlanningFrame(const geometry_msgs::PoseStamped& pose);
+
     void goPreset(const std::string& target);
 
     void moveJoints(const std::vector<double>& joint_group_positions);
@@ -147,6 +162,9 @@ namespace moveit_control
     ros::ServiceClient gz_set_client_;
     ros::ServiceClient attach_gz_client_;
     ros::ServiceClient detach_gz_client_;
+
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> transform_listener_;
 
     bool initialize_;
     double position_tolerance_;
