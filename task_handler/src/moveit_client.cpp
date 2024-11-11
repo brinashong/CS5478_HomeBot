@@ -365,19 +365,25 @@ namespace moveit_control
   {
     if (!initCheck()) return std::nullopt;
 
+    geometry_msgs::PoseStamped pose_in_target_frame;
     try
     {
       auto transform = tf_buffer_->lookupTransform(
           target_frame, pose.header.frame_id, ros::Time(0));
 
-        geometry_msgs::PoseStamped pose_in_target_frame;
-        tf2::doTransform(pose_in_source_frame, pose_in_target_frame, transform);
+      tf2::doTransform(pose, pose_in_target_frame, transform);
     }
     catch (const std::exception &e)
     {
-      std::cout << "message" << std::endl;
+      ROS_WARN_STREAM(__func__ << ": Failed to tranform pose to given frame.");
       return std::nullopt;
     };
+    return {pose_in_target_frame};
+  }
+
+  std::optional<geometry_msgs::PoseStamped> MoveItClient::getPoseInPlanningFrame(const geometry_msgs::PoseStamped& pose)
+  {
+    return getPoseInGivenFrame(control_->getPlanningFrame(), pose);
   }
 
   void MoveItClient::goPreset(const std::string& target)
