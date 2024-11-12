@@ -13,25 +13,44 @@ int main (int argc, char *argv[])
   spinner.start();
 
   static const std::string arm_planning_group = "stretch_arm";
+  static const std::string gripper_planning_group = "stretch_gripper";
   auto arm_control_interface =
     std::make_shared<moveit::planning_interface::MoveGroupInterface>(arm_planning_group);
+  auto gripper_control_interface =
+    std::make_shared<moveit::planning_interface::MoveGroupInterface>(gripper_planning_group);
 
   moveit_control::MoveItClient control_arm(
       nh_,
       arm_control_interface,
+      gripper_control_interface,
       arm_planning_group);
 
-  ROS_INFO_STREAM("MOVING TO EXTENDED POSITION");
-  control_arm.goPreset("extended");
-  control_arm.addBox({1, 1, 0.3}, "test_box", "map");
-  ROS_INFO_STREAM("DONE MOVING TO EXTENDED POSITION!!!!!");
+  ROS_INFO_STREAM("MOVING TO HOME");
+  control_arm.goPreset("home");
+  ROS_INFO_STREAM("DONE MOVING TO HOME!!!!!");
   std::this_thread::sleep_for(std::chrono::seconds(1));
 
-  ROS_INFO_STREAM("MOVING TO HOME POSITION");
-  control_arm.movePose({-1.0, -1.0, 0.0, 0.0, 0.0, 0.0});
-  // control_arm.moveRandomValidPose();
-  ROS_INFO_STREAM("DONE MOVING TO HOME POSITION!!!!!");
-  // control_arm.moveZWithCurrentPoseDefaultConstraints(0.4);
+  ROS_INFO_STREAM("MOVING TO HOVER");
+  control_arm.goPreset("hover");
+  ROS_INFO_STREAM("DONE MOVING TO HOVER!!!!!");
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+
+  ROS_INFO_STREAM("MOVING TO APPROACH");
+  control_arm.goPreset("approach");
+  ROS_INFO_STREAM("DONE MOVING TO APPROACH!!!!!");
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+
+  ROS_INFO_STREAM("MOVING TO GRIPPER TO SODA CAN PRESET");
+  control_arm.goPresetGripper("soda_can");
+  ROS_INFO_STREAM("DONE MOVING TO GRIPPER TO SODA CAN PRESET!!!!!");
+
+  ROS_WARN_STREAM("ATTACHING CAN PEPSI");
+  control_arm.attachGazeboModel("Coke", "link");
+  ROS_WARN_STREAM("FINISHED ATTACHING CAN PEPSI");
+
+  // ROS_WARN_STREAM("DETACHING CAN PEPSI");
+  // control_arm.detachGazeboModel("Coke", "link");
+  // ROS_WARN_STREAM("FINISHED DETACHING CAN PEPSI");
 
   control_arm.printUsefulInfo();
 

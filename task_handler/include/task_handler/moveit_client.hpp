@@ -5,6 +5,7 @@
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
 #include <geometry_msgs/Pose.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 // MoveIt
 #include <moveit/move_group_interface/move_group_interface.h>
@@ -39,6 +40,7 @@ namespace moveit_control
   public:
     explicit MoveItClient(const ros::NodeHandle& n,
         std::shared_ptr<moveit::planning_interface::MoveGroupInterface> control,
+        std::shared_ptr<moveit::planning_interface::MoveGroupInterface> gripper_control,
         const std::string& planning_group,
         std::vector<moveit_msgs::JointConstraint> default_joint_contraints = {});
 
@@ -60,12 +62,12 @@ namespace moveit_control
     /**
      * \brief Attach Gazebo model to end effector
      */
-    bool attachGazeboModel(const std::string& object_id);
+    bool attachGazeboModel(const std::string& object_id, const std::string& link_name = "link");
 
     /**
      * \brief Detach Gazebo model from end effector
      */
-    bool detachGazeboModel(const std::string& object_id);
+    bool detachGazeboModel(const std::string& object_id, const std::string& link_name = "link");
 
     /**
      * \brief Get Gazebo model pose
@@ -95,6 +97,8 @@ namespace moveit_control
     std::optional<geometry_msgs::PoseStamped> getPoseInPlanningFrame(const geometry_msgs::PoseStamped& pose);
 
     void goPreset(const std::string& target);
+
+    void goPresetGripper(const std::string& target);
 
     void moveJoints(const std::vector<double>& joint_group_positions);
 
@@ -154,6 +158,7 @@ namespace moveit_control
     bool initCheck();
     ros::NodeHandle n_;
     std::shared_ptr<moveit::planning_interface::MoveGroupInterface> control_;
+    std::shared_ptr<moveit::planning_interface::MoveGroupInterface> gripper_control_;
     ros::Publisher planning_scene_pub_;
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
     std::vector<moveit_msgs::JointConstraint> default_joint_contraints_;

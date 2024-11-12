@@ -7,10 +7,12 @@ namespace moveit_control
 {
   MoveItClient::MoveItClient(const ros::NodeHandle& n,
       std::shared_ptr<moveit::planning_interface::MoveGroupInterface> control,
+      std::shared_ptr<moveit::planning_interface::MoveGroupInterface> gripper_control,
       const std::string& planning_group,
       std::vector<moveit_msgs::JointConstraint> default_joint_contraints)
     : n_{n}
     , control_{control}
+    , gripper_control_{gripper_control}
     , default_joint_contraints_{default_joint_contraints}
     , initialize_{false}
     , position_tolerance_{0.01}
@@ -26,6 +28,7 @@ namespace moveit_control
     , tf_buffer_{std::make_unique<tf2_ros::Buffer>()}
     , transform_listener_{std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)}
   {
+    // Arm
     control_->setGoalPositionTolerance(position_tolerance_);
     control_->setGoalOrientationTolerance(orientation_tolerance_);
     control_->setGoalJointTolerance(joint_tolerance_);
@@ -45,6 +48,19 @@ namespace moveit_control
     control_->allowReplanning(true);
     control_->setPlanningTime(planning_time_);
     control_->setPlannerId("RRTConnect");
+
+    // Gripper
+    gripper_control_->setGoalPositionTolerance(position_tolerance_);
+    gripper_control_->setGoalOrientationTolerance(orientation_tolerance_);
+    gripper_control_->setGoalJointTolerance(joint_tolerance_);
+
+    gripper_control_->setMaxAccelerationScalingFactor(max_acc_scale_factor_);
+    gripper_control_->setMaxVelocityScalingFactor(max_vel_scale_factor_);
+    gripper_control_->setNumPlanningAttempts(num_planning_attempt_);
+
+    gripper_control_->allowReplanning(true);
+    gripper_control_->setPlanningTime(planning_time_);
+    gripper_control_->setPlannerId("RRTConnect");
 
     gz_get_client_ = n_.serviceClient<gazebo_msgs::GetModelState>("/gazebo/get_model_state");
     gz_set_client_ = n_.serviceClient<gazebo_msgs::SetModelState>("/gazebo/set_model_state");
@@ -250,16 +266,16 @@ namespace moveit_control
     return true;
   }
 
-  bool MoveItClient::attachGazeboModel(const std::string& object_id)
+  bool MoveItClient::attachGazeboModel(const std::string& object_id, const std::string& link_name)
   {
     if (!initCheck()) return false;
 
     gazebo_ros_link_attacher::Attach attach_msg;
     attach_msg.request.model_name_1 = "robot";
-    attach_msg.request.link_name_1 = "att_link";
+    attach_msg.request.link_name_1 = "link_wrist_yaw";
 
     attach_msg.request.model_name_2 = object_id;
-    attach_msg.request.link_name_2 = "att_link";
+    attach_msg.request.link_name_2 = link_name;
 
     // Call attach service
     if (attach_gz_client_.call(attach_msg))
@@ -274,26 +290,26 @@ namespace moveit_control
     }
   }
 
-  bool MoveItClient::detachGazeboModel(const std::string& object_id)
+  bool MoveItClient::detachGazeboModel(const std::string& object_id, const std::string& link_name)
   {
     if (!initCheck()) return false;
 
     gazebo_ros_link_attacher::Attach attach_msg;
     attach_msg.request.model_name_1 = "robot";
-    attach_msg.request.link_name_1 = "att_link";
+    attach_msg.request.link_name_1 = "link_wrist_yaw";
 
     attach_msg.request.model_name_2 = object_id;
-    attach_msg.request.link_name_2 = "att_link";
+    attach_msg.request.link_name_2 = link_name;
 
     // Call detach service
     if (detach_gz_client_.call(attach_msg))
     {
-      ROS_INFO_STREAM(__func__ << ": Model " << object_id << " attached!");
+      ROS_INFO_STREAM(__func__ << ": Model " << object_id << " detached!");
       return true;
     }
     else
     {
-      ROS_ERROR_STREAM(__func__ << ": Failed to call attach service");
+      ROS_ERROR_STREAM(__func__ << ": Failed to call detach service");
       return false;
     }
   }
@@ -400,6 +416,24 @@ namespace moveit_control
     else
     {
       ROS_ERROR_STREAM(__func__ << ": Failed to plan to target \"" << target << "\" positions." );
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+
+  void MoveItClient::goPresetGripper(const std::string& target)
+  {
+    if (!initCheck()) return;
+
+    gripper_control_->setNamedTarget(target);
+
+    if (moveit::planning_interface::MoveGroupInterface::Plan plan;
+        gripper_control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
+    {
+      gripper_control_->execute(plan);
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to plan gripper to preset \"" << target << "\"." );
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
