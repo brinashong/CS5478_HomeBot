@@ -41,6 +41,7 @@ namespace moveit_control
     explicit MoveItClient(const ros::NodeHandle& n,
         std::shared_ptr<moveit::planning_interface::MoveGroupInterface> control,
         std::shared_ptr<moveit::planning_interface::MoveGroupInterface> gripper_control,
+        std::shared_ptr<moveit::planning_interface::MoveGroupInterface> camera_control,
         const std::string& planning_group,
         std::vector<moveit_msgs::JointConstraint> default_joint_contraints = {});
 
@@ -159,6 +160,7 @@ namespace moveit_control
     ros::NodeHandle n_;
     std::shared_ptr<moveit::planning_interface::MoveGroupInterface> control_;
     std::shared_ptr<moveit::planning_interface::MoveGroupInterface> gripper_control_;
+    std::shared_ptr<moveit::planning_interface::MoveGroupInterface> camera_control_;
     ros::Publisher planning_scene_pub_;
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
     std::vector<moveit_msgs::JointConstraint> default_joint_contraints_;

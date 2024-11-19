@@ -1,18 +1,17 @@
 #include "task_handler/moveit_client.hpp"
-#include "geometry_msgs/PoseStamped.h"
-#include "moveit_msgs/AttachedCollisionObject.h"
-#include "ros/console.h"
 
 namespace moveit_control
 {
   MoveItClient::MoveItClient(const ros::NodeHandle& n,
       std::shared_ptr<moveit::planning_interface::MoveGroupInterface> control,
       std::shared_ptr<moveit::planning_interface::MoveGroupInterface> gripper_control,
+      std::shared_ptr<moveit::planning_interface::MoveGroupInterface> camera_control,
       const std::string& planning_group,
       std::vector<moveit_msgs::JointConstraint> default_joint_contraints)
     : n_{n}
     , control_{control}
     , gripper_control_{gripper_control}
+    , camera_control_{camera_control}
     , default_joint_contraints_{default_joint_contraints}
     , initialize_{false}
     , position_tolerance_{0.01}
@@ -61,6 +60,19 @@ namespace moveit_control
     gripper_control_->allowReplanning(true);
     gripper_control_->setPlanningTime(planning_time_);
     gripper_control_->setPlannerId("RRTConnect");
+
+    // Camera
+    camera_control_->setGoalPositionTolerance(position_tolerance_);
+    camera_control_->setGoalOrientationTolerance(orientation_tolerance_);
+    camera_control_->setGoalJointTolerance(joint_tolerance_);
+
+    camera_control_->setMaxAccelerationScalingFactor(max_acc_scale_factor_);
+    camera_control_->setMaxVelocityScalingFactor(max_vel_scale_factor_);
+    camera_control_->setNumPlanningAttempts(num_planning_attempt_);
+
+    camera_control_->allowReplanning(true);
+    camera_control_->setPlanningTime(planning_time_);
+    camera_control_->setPlannerId("RRTConnect");
 
     gz_get_client_ = n_.serviceClient<gazebo_msgs::GetModelState>("/gazebo/get_model_state");
     gz_set_client_ = n_.serviceClient<gazebo_msgs::SetModelState>("/gazebo/set_model_state");
