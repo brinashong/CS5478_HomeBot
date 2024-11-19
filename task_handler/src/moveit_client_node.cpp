@@ -1,9 +1,16 @@
-#include "moveit/move_group_interface/move_group_interface.h"
-#include "moveit_msgs/JointConstraint.h"
-#include "ros/node_handle.h"
 #include "task_handler/moveit_client.hpp"
-#include <memory>
-#include <thread>
+
+/**
+ *  Object List
+ *  ===========
+ *  - KitchenMug
+ *  - KitchenBowl
+ *  - SonyBox
+ *  - Book
+ *  - Coke1
+ *  - Coke2
+ *  - LivingRoomMug
+ */
 
 int main (int argc, char *argv[])
 {
@@ -49,7 +56,7 @@ int main (int argc, char *argv[])
   ROS_INFO_STREAM("DONE MOVING TO GRIPPER TO SODA CAN PRESET!!!!!");
 
   ROS_WARN_STREAM("ATTACHING CAN PEPSI");
-  moveit_control.attachGazeboModel("Coke", "link");
+  moveit_control.attachGazeboModel("Coke1", "link");
   ROS_WARN_STREAM("FINISHED ATTACHING CAN PEPSI");
 
   ROS_INFO_STREAM("MOVING TO HOVER AGAIN");
@@ -65,7 +72,7 @@ int main (int argc, char *argv[])
 
   auto exec2 = std::thread([&](){
     ROS_WARN_STREAM("DETACHING CAN PEPSI");
-    moveit_control.detachGazeboModel("Coke", "link");
+    moveit_control.detachGazeboModel("Coke1", "link");
     ROS_WARN_STREAM("FINISHED DETACHING CAN PEPSI");
   });
 
