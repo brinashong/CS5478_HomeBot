@@ -8,7 +8,7 @@ command line, type `pip install ultralytics`
 ```
 roslaunch stretch_navigation navigation_gazebo.launch
 
-roslaunch stretch_config demo_gazebo.launch
+roslaunch stretch_moveit_config demo_gazebo.launch
 
 rosrun task_handler task_handler_node
 
