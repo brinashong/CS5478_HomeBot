@@ -16,6 +16,8 @@
   <depend>std_srvs</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>task_handler</depend>
+  <depend>tf2</depend>
 
   <export>
     <rviz plugin="${prefix}/homebot_panel_plugin.xml"/>

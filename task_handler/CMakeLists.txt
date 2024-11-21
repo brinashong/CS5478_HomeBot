@@ -14,9 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   move_base_msgs
   visualization_msgs
   message_generation
-  moveit_core
   moveit_ros_planning
-  moveit_ros_planning_interface
   geometric_shapes
   moveit_visual_tools
   tf2_ros
@@ -66,11 +64,10 @@ add_message_files(
 )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+  FILES
+  GoalTask.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -135,6 +132,7 @@ include_directories(
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
   src/task_handler.cpp
+  src/moveit_client.cpp
 )
 
 ## Add cmake target dependencies of the library
@@ -156,7 +154,7 @@ add_executable(${PROJECT_NAME}_node src/task_handler_node.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node

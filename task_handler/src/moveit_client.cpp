@@ -414,6 +414,67 @@ namespace moveit_control
     return getPoseInGivenFrame(control_->getPlanningFrame(), pose);
   }
 
+  Eigen::Isometry3d MoveItClient::poseMsgToEigen(const geometry_msgs::Pose& msg)
+  {
+    Eigen::Isometry3d approx_target;
+    Eigen::Translation3d translation(msg.position.x, msg.position.y, msg.position.z);
+    Eigen::Quaterniond quaternion(msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z);
+    if ((quaternion.x() == 0) && (quaternion.y() == 0) && (quaternion.z() == 0) && (quaternion.w() == 0))
+    {
+      ROS_WARN_STREAM(__func__ << ": Empty quaternion found in pose message. Setting to neutral orientation.");
+      quaternion.setIdentity();
+    }
+    else
+    {
+      quaternion.normalize();
+    }
+    approx_target = translation * quaternion;
+    return approx_target;
+  }
+
+  void MoveItClient::hoverArm(const geometry_msgs::PoseStamped& target_pose)
+  {
+    if (!initCheck()) return;
+
+    auto transformed_pose = getPoseInPlanningFrame(target_pose);
+    if (!transformed_pose.has_value()) return;
+
+    transformed_pose->pose.position.z += 0.1; // 10cm above
+    control_->setApproximateJointValueTarget(poseMsgToEigen(transformed_pose.value().pose), control_->getEndEffectorLink());
+
+    if (moveit::planning_interface::MoveGroupInterface::Plan plan;
+        control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
+    {
+      control_->execute(plan);
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to plan to target");
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+
+  void MoveItClient::approachArm(const geometry_msgs::PoseStamped& target_pose)
+  {
+    if (!initCheck()) return;
+
+    auto transformed_pose = getPoseInPlanningFrame(target_pose);
+    if (!transformed_pose.has_value()) return;
+
+    control_->setApproximateJointValueTarget(poseMsgToEigen(transformed_pose.value().pose), control_->getEndEffectorLink());
+
+    if (moveit::planning_interface::MoveGroupInterface::Plan plan;
+        control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
+    {
+      control_->execute(plan);
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to plan to target");
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+
   void MoveItClient::goPreset(const std::string& target)
   {
     if (!initCheck()) return;

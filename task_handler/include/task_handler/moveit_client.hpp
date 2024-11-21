@@ -21,7 +21,7 @@
 #include <gazebo_msgs/ModelState.h>
 #include <gazebo_msgs/GetModelState.h>
 #include <gazebo_msgs/SetModelState.h>
-#include <gazebo_ros_link_attacher/Attach.h>
+#include "gazebo_ros_link_attacher/Attach.h"
 
 
 // STL
@@ -96,6 +96,12 @@ namespace moveit_control
      * \brief Transform pose to planning frame
      */
     std::optional<geometry_msgs::PoseStamped> getPoseInPlanningFrame(const geometry_msgs::PoseStamped& pose);
+
+    Eigen::Isometry3d poseMsgToEigen(const geometry_msgs::Pose& msg);
+
+    void hoverArm(const geometry_msgs::PoseStamped& target_pose);
+
+    void approachArm(const geometry_msgs::PoseStamped& target_pose);
 
     void goPreset(const std::string& target);
 

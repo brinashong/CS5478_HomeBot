@@ -7,9 +7,13 @@
 #include <std_srvs/SetBool.h>
 #include <std_msgs/String.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <geometry_msgs/Quaternion.h>
 
 #include <QString>
 #include <ui_homebot_panel.h>
+
+#include "task_handler/GoalTask.h"
 
 namespace rviz_panel
 {
@@ -33,6 +37,7 @@ namespace rviz_panel
 
       private Q_SLOTS:
         void button();
+        void comboBox();
 
     protected:
       std::shared_ptr<Ui::HomebotPanel> ui_;
@@ -40,11 +45,12 @@ namespace rviz_panel
       ros::NodeHandle nh_;
       ros::Subscriber state_sub_;
       ros::Subscriber task_sub_;
-      ros::Subscriber goal_sub_;
       ros::ServiceClient goal_srv_client_;
       ros::ServiceServer reset_srv_server_;
 
       bool sent_goal;
+      std::string zone_;
+      geometry_msgs::PoseStamped goal_;
   };
 } // rviz_panel
 

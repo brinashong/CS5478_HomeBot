@@ -12,6 +12,8 @@ find_package(catkin REQUIRED COMPONENTS
   std_srvs
   std_msgs
   geometry_msgs
+  task_handler
+  tf2
 )
 
 catkin_package(

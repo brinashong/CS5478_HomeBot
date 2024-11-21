@@ -6,19 +6,26 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
     gripper_group_{"stretch_gripper"},
     tf2_listener{tf2_buffer}
 {
-  arm_group_.setGoalPositionTolerance(0.1);
-  arm_group_.setGoalOrientationTolerance(0.1);
-  arm_group_.setGoalJointTolerance(0.001);
-  // arm_group_.setPlannerId("RRTConnectkConfigDefault");
-  arm_group_.setPlanningTime(10.0);
+  static const std::string arm_planning_group = "stretch_arm";
+  static const std::string gripper_planning_group = "stretch_gripper";
+  static const std::string camera_planning_group = "stretch_head";
 
-  gripper_group_.setGoalPositionTolerance(0.001);
-  gripper_group_.setGoalOrientationTolerance(0.01);
-  gripper_group_.setGoalJointTolerance(0.001);
-  gripper_group_.setPlannerId("TRRT");
-  gripper_group_.setPlanningTime(10.0);
+  auto arm_control_interface =
+    std::make_shared<moveit::planning_interface::MoveGroupInterface>(arm_planning_group);
+  auto gripper_control_interface =
+    std::make_shared<moveit::planning_interface::MoveGroupInterface>(gripper_planning_group);
+  auto camera_control_interface =
+    std::make_shared<moveit::planning_interface::MoveGroupInterface>(camera_planning_group);
 
-  goal_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("/move_base_simple/goal", 1, [this](const geometry_msgs::PoseStamped::ConstPtr& input){ this->goalCallback(input); });
+  moveit_control_ = std::make_unique<moveit_control::MoveItClient>
+  (
+    nh_,
+    arm_control_interface,
+    gripper_control_interface,
+    camera_control_interface,
+    arm_planning_group
+  );
+
   result_sub_ = nh_.subscribe<move_base_msgs::MoveBaseActionResult>("/move_base/result", 1, [this](const move_base_msgs::MoveBaseActionResult::ConstPtr& msg){ this->mbResultCallback(msg); });
   object_poses_sub_ = nh_.subscribe<task_handler::Objects>("/object_poses", 1, [this](const task_handler::Objects::ConstPtr& msg){ this->objectPosesCallback(msg); });
 
@@ -83,36 +90,15 @@ TaskHandler::~TaskHandler()
 {
 }
 
-void TaskHandler::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& input)
-{
-  ROS_INFO_STREAM("New rviz goal received!");
-
-  goal_ = *input;
-
-  visualization_msgs::Marker marker;
-  marker.header.frame_id = goal_.header.frame_id;
-  marker.header.stamp = goal_.header.stamp;
-  marker.id = 0;
-  marker.type = visualization_msgs::Marker::ARROW;
-  marker.action = visualization_msgs::Marker::ADD;
-  marker.pose = goal_.pose;
-  marker.scale.x = 1;
-  marker.scale.y = 0.1;
-  marker.scale.z = 0.1;
-  marker.color.a = 1.0;
-  marker.color.r = 0.0;
-  marker.color.g = 1.0;
-  marker.color.b = 0.0;
-  goal_pub_.publish(marker);
-}
-
-bool TaskHandler::uiButtonCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res)
+bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_handler::GoalTask::Response &res)
 {
   // send mb goal
-  if (req.data)
+  if (req.active)
   {
+    std::cout << "received: " << req.goal.pose.position.x << " " << req.goal.pose.position.y << std::endl;
+
     move_base_msgs::MoveBaseGoal goal;
-    goal.target_pose = goal_;
+    goal.target_pose = req.goal;
     goal.target_pose.header.stamp = ros::Time::now();
     ac_->sendGoal(goal);
     res.success = true;
@@ -123,6 +109,80 @@ bool TaskHandler::uiButtonCallback(std_srvs::SetBool::Request &req, std_srvs::Se
     state_pub_.publish(state_str_);
     task_str_.data = "Executing plan...";
     task_pub_.publish(task_str_);
+
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = req.goal.header.frame_id;
+    marker.header.stamp = goal.target_pose.header.stamp;
+    marker.id = 0;
+    marker.type = visualization_msgs::Marker::ARROW;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.pose = goal.target_pose.pose;
+    marker.scale.x = 1;
+    marker.scale.y = 0.1;
+    marker.scale.z = 0.1;
+    marker.color.a = 1.0;
+    marker.color.r = 0.0;
+    marker.color.g = 1.0;
+    marker.color.b = 0.0;
+    goal_pub_.publish(marker);
+
+    // TEMP
+    std::queue<task_handler::Object> empty;
+    std::swap( objects_, empty );
+    if (req.zone == "Coffee Table")
+    {
+      task_handler::Object obj;
+
+      auto pose = moveit_control_->getGazeboModelPose("Coke1");
+      if (pose.has_value())
+      {
+        obj.id = "can";
+        obj.name = "Coke1";
+        obj.pose = pose.value();
+        objects_.push(obj);
+      }
+
+      pose = moveit_control_->getGazeboModelPose("Coke2");
+      if (pose.has_value())
+      {
+        obj.id = "can";
+        obj.name = "Coke2";
+        obj.pose = pose.value();
+        objects_.push(obj);
+      }
+
+      pose = moveit_control_->getGazeboModelPose("LivingRoomMug");
+      if (pose.has_value())
+      {
+        obj.id = "cup";
+        obj.name = "LivingRoomMug";
+        obj.pose = pose.value();
+        objects_.push(obj);
+      }
+
+    }
+    else if (req.zone == "Dining Table")
+    {
+      task_handler::Object obj;
+
+      auto pose = moveit_control_->getGazeboModelPose("Book");
+      if (pose.has_value())
+      {
+        obj.id = "book";
+        obj.name = "Book";
+        obj.pose = pose.value();
+        objects_.push(obj);
+      }
+
+      pose = moveit_control_->getGazeboModelPose("SonyBox");
+      if (pose.has_value())
+      {
+        obj.id = "book";
+        obj.name = "SonyBox";
+        obj.pose = pose.value();
+        objects_.push(obj);
+      }
+    }
   }
   else // abort task
   {
@@ -155,6 +215,12 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
         state_pub_.publish(state_str_);
         task_str_.data = "Detecting objects...";
         task_pub_.publish(task_str_);
+
+        // TEMP
+        curr_state_ = State::GO_TO_OBJECT;
+        state_str_.data = "Go to object";
+        state_pub_.publish(state_str_);
+        sendObjectGoal();
         break;
       case State::GO_TO_OBJECT:
         curr_state_ = State::PICK_OBJECT;
@@ -206,13 +272,57 @@ void TaskHandler::objectPosesCallback(const task_handler::Objects::ConstPtr& msg
 void TaskHandler::sendObjectGoal()
 {
   // TODO: find suitable approach coordinates
+  // get object pose in baselink frame
+  auto pose_in_base_link = poseInBaseLink(objects_.front().pose); 
+
+  // // get baselink pose
+  // geometry_msgs::TransformStamped transform;
+  // geometry_msgs::PoseStamped baselink_pose;
+  // try
+  // {
+  //   transform = tf2_buffer.lookupTransform("map", "base_link", ros::Time(0), ros::Duration(3.0));
+  //
+  //   baselink_pose.header = transform.header;
+  //   baselink_pose.pose.position.x = transform.transform.translation.x;
+  //   baselink_pose.pose.position.y = transform.transform.translation.y;
+  //   baselink_pose.pose.position.z = transform.transform.translation.z;
+  //   baselink_pose.pose.orientation.x = transform.transform.rotation.x;
+  //   baselink_pose.pose.orientation.y = transform.transform.rotation.y;
+  //   baselink_pose.pose.orientation.z = transform.transform.rotation.z;
+  //   baselink_pose.pose.orientation.w = transform.transform.rotation.w;
+  //
+  //   ROS_INFO_STREAM("Baselink Pose: " << baselink_pose);
+  // }
+  // catch (tf2::TransformException &ex)
+  // {
+  //   ROS_WARN("Could not transform pose: %s", ex.what());
+  //   return;
+  // }
+
+  auto delta = pose_in_base_link;
+  delta.pose.position.y = 0.0;
+  delta.pose.orientation.w = 1.0;
+
+  geometry_msgs::PoseStamped target;
+  try
+  {
+    tf2_buffer.canTransform("map", "base_link", ros::Time(0), ros::Duration(3.0));
+
+    target = tf2_buffer.transform(delta, "map");
+
+    ROS_INFO_STREAM("Transformed Pose: " << target);
+  }
+  catch (tf2::TransformException &ex)
+  {
+    ROS_WARN("Could not transform pose: %s", ex.what());
+    return;
+  }
+
   move_base_msgs::MoveBaseGoal goal;
   goal.target_pose.header.frame_id = "map";
   goal.target_pose.header.stamp = ros::Time::now();
 
-  goal.target_pose.pose.position.x = objects_.front().pose.position.x;
-  goal.target_pose.pose.position.y = objects_.front().pose.position.y;
-  goal.target_pose.pose.orientation.w = 1.0;
+  goal.target_pose = target;
 
   ROS_INFO_STREAM("Sending object goal");
 
@@ -227,22 +337,33 @@ void TaskHandler::pickObject()
   ROS_INFO_STREAM("Picking up object");
 
   auto object = objects_.front();
+  geometry_msgs::PoseStamped object_stamped;
+  object_stamped.header.frame_id = "map";
+  object_stamped.header.stamp = ros::Time::now();
 
-  // move TCP to above object
-  auto pose_in_base_link = poseInBaseLink(object.pose);
-  moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
+  moveit_control_->goPreset("home");
+  object_stamped.pose = object.pose;
+  moveit_control_->hoverArm(object_stamped);
+  moveit_control_->approachArm(object_stamped);
+  moveit_control_->goPresetGripper(object.id);
+  moveit_control_->attachGazeboModel(object.name, "link");
+  moveit_control_->hoverArm(object_stamped);
+  moveit_control_->goPreset("home");
 
-  // open the gripper
-  moveGripper("open");
-
-  // move the TCP close to the object
-  moveArm(pose_in_base_link.pose.position.z, pose_in_base_link.pose.position.y);
-
-  // close the gripper
-  moveGripper("closed");
-
-  // TODO: lift it up a bit
-  moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
+  // // move TCP to above object
+  // auto pose_in_base_link = poseInBaseLink(object.pose); moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
+  //
+  // // open the gripper
+  // moveGripper("open");
+  //
+  // // move the TCP close to the object
+  // moveArm(pose_in_base_link.pose.position.z, pose_in_base_link.pose.position.y);
+  //
+  // // close the gripper
+  // moveGripper("closed");
+  //
+  // // TODO: lift it up a bit
+  // moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
 
   // once done picking
   curr_state_ = State::GO_TO_TARGET_LOC;
@@ -252,19 +373,13 @@ void TaskHandler::pickObject()
   move_base_msgs::MoveBaseGoal goal;
   goal.target_pose.header.frame_id = "map";
   goal.target_pose.header.stamp = ros::Time::now();
-
-  goal.target_pose.pose.position.x = target_loc_map_[object_loc_map_[objects_.front().name]].position.x;
-  goal.target_pose.pose.position.y = target_loc_map_[object_loc_map_[objects_.front().name]].position.y;
-  goal.target_pose.pose.orientation.x = target_loc_map_[object_loc_map_[objects_.front().name]].orientation.x;
-  goal.target_pose.pose.orientation.y = target_loc_map_[object_loc_map_[objects_.front().name]].orientation.y;
-  goal.target_pose.pose.orientation.z = target_loc_map_[object_loc_map_[objects_.front().name]].orientation.z;
-  goal.target_pose.pose.orientation.w = target_loc_map_[object_loc_map_[objects_.front().name]].orientation.w;
+  goal.target_pose.pose = target_loc_map_[object_loc_map_[objects_.front().id]];
 
   ROS_INFO_STREAM("Sending target destination");
 
   ac_->sendGoal(goal);
 
-  task_str_.data = "Going to " + object_loc_map_[objects_.front().name] + "...";
+  task_str_.data = "Going to " + object_loc_map_[objects_.front().id] + "...";
   task_pub_.publish(task_str_);
 }
 
@@ -272,20 +387,40 @@ void TaskHandler::placeObject()
 {
   ROS_INFO_STREAM("Placing object");
 
-  auto target_pose = target_loc_map_[objects_.front().name];
+  auto object = objects_.front();
+  geometry_msgs::PoseStamped target_pose;
+  target_pose.pose = target_loc_map_[object.id];
+  target_pose.header.frame_id = "map";
+  target_pose.header.stamp = ros::Time::now();
 
-  // Move the TCP above
-  auto pose_in_base_link = poseInBaseLink(target_pose);
-  moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
+  moveit_control_->hoverArm(target_pose);
+  moveit_control_->approachArm(target_pose);
 
-  // Lower the TCP
-  moveArm(pose_in_base_link.pose.position.z, pose_in_base_link.pose.position.y);
+  auto exec1 = std::thread([&](){
+    moveit_control_->goPresetGripper("open");
+  });
 
-  // Open the gripper
-  moveGripper("open");
+  auto exec2 = std::thread([&](){
+    moveit_control_->detachGazeboModel(object.name, "link");
+  });
 
-  // lift the arm a bit
-  moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
+  if (exec1.joinable()) exec1.join();
+  if (exec2.joinable()) exec2.join();
+
+  moveit_control_->goPreset("home");
+
+  // // Move the TCP above
+  // auto pose_in_base_link = poseInBaseLink(target_pose);
+  // moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
+  //
+  // // Lower the TCP
+  // moveArm(pose_in_base_link.pose.position.z, pose_in_base_link.pose.position.y);
+  //
+  // // Open the gripper
+  // moveGripper("open");
+  //
+  // // lift the arm a bit
+  // moveArm(pose_in_base_link.pose.position.z + 0.2, pose_in_base_link.pose.position.y);
 
   // once done placing
   objects_.pop();
