@@ -7,9 +7,13 @@ import cv2
 from pathlib import Path
 from task_handler.msg import Object, Objects
 from geometry_msgs.msg import Point, Quaternion, Pose
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
 
 import os
 from ultralytics import YOLO
+
+bridge = CvBridge()
 
 # clean up the output directory before each running
 def cleanup_image_path(img_path):
@@ -75,6 +79,13 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
             results[0].save(out_filename)
             msg.objects = obj_list
     
+    
+            tagged_image = cv2.imread(out_filename)
+            cv2.imshow("Tagged Image",tagged_image)
+            cv2.waitKey(1)
+            # if you want to show the image in Rviz, uncomment the following line, and add ros_image to return value
+            # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
+
     # temporarily for debugging purpose
     print(msg)
 
@@ -94,9 +105,13 @@ if __name__ == '__main__':
     cleanup_image_path(imageOutputDir)
 
     try:
-        rospy.init_node('stretch_hello_obj_loc_publisher', )
+        rospy.init_node('stretch_hello_obj_loc_publisher', anonymous=True)
         rospy.loginfo("begin sending object detection info...")
-        obj_pub = rospy.Publisher('/objects_location', Objects, queue_size=100)
+        obj_pub = rospy.Publisher('/objects_poses', Objects, queue_size=100)
+
+        # if you want to show image in rviz, uncomment the following line to publish to the topic /sensor_msgs/Image
+        # rviz_camera = rospy.Publisher("/sensor_msgs/Image", Image, queue_size=100)
+
         rate = rospy.Rate(1)
 
         while not rospy.is_shutdown():
@@ -104,11 +119,10 @@ if __name__ == '__main__':
 
             if msg is not None:
                 obj_pub.publish(msg)
+                # rviz_camera.publish(rviz_img)
 
             rate.sleep()
     except rospy.ROSInterruptException:
         pass
     finally:
         cv2.destroyAllWindows() 
-
-    # process_image(imageSaveDir, depthImageSaveDir, imageOutputDir)
