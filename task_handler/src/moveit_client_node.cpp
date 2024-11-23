@@ -36,48 +36,52 @@ int main (int argc, char *argv[])
       camera_control_interface,
       arm_planning_group);
 
-  ROS_INFO_STREAM("MOVING TO HOME");
-  moveit_control.goPreset("home");
-  ROS_INFO_STREAM("DONE MOVING TO HOME!!!!!");
-  std::this_thread::sleep_for(std::chrono::seconds(1));
+  // Init gripper
+  moveit_control.goPresetGripper("closed");
+  moveit_control.goPresetGripper("open");
 
-  ROS_INFO_STREAM("MOVING TO HOVER");
-  moveit_control.goPreset("hover");
-  ROS_INFO_STREAM("DONE MOVING TO HOVER!!!!!");
-  std::this_thread::sleep_for(std::chrono::seconds(1));
-
-  ROS_INFO_STREAM("MOVING TO APPROACH");
-  moveit_control.goPreset("approach");
-  ROS_INFO_STREAM("DONE MOVING TO APPROACH!!!!!");
-  std::this_thread::sleep_for(std::chrono::seconds(1));
-
-  ROS_INFO_STREAM("MOVING TO GRIPPER TO SODA CAN PRESET");
-  moveit_control.goPresetGripper("soda_can");
-  ROS_INFO_STREAM("DONE MOVING TO GRIPPER TO SODA CAN PRESET!!!!!");
-
-  ROS_WARN_STREAM("ATTACHING CAN PEPSI");
-  moveit_control.attachGazeboModel("Coke1", "link");
-  ROS_WARN_STREAM("FINISHED ATTACHING CAN PEPSI");
-
-  ROS_INFO_STREAM("MOVING TO HOVER AGAIN");
-  moveit_control.goPreset("hover");
-  ROS_INFO_STREAM("DONE MOVING TO HOVER AGAIN!!!!!");
-  std::this_thread::sleep_for(std::chrono::seconds(1));
-
-  auto exec1 = std::thread([&](){
-    ROS_WARN_STREAM("OPENING GRIPPER");
-    moveit_control.goPresetGripper("open");
-    ROS_WARN_STREAM("FINISHED OPENING GRIPPER");
-  });
-
-  auto exec2 = std::thread([&](){
-    ROS_WARN_STREAM("DETACHING CAN PEPSI");
-    moveit_control.detachGazeboModel("Coke1", "link");
-    ROS_WARN_STREAM("FINISHED DETACHING CAN PEPSI");
-  });
-
-  if (exec1.joinable()) exec1.join();
-  if (exec2.joinable()) exec2.join();
+  // ROS_INFO_STREAM("MOVING TO HOME");
+  // moveit_control.goPreset("home");
+  // ROS_INFO_STREAM("DONE MOVING TO HOME!!!!!");
+  // std::this_thread::sleep_for(std::chrono::seconds(1));
+  //
+  // ROS_INFO_STREAM("MOVING TO HOVER");
+  // moveit_control.goPreset("hover");
+  // ROS_INFO_STREAM("DONE MOVING TO HOVER!!!!!");
+  // std::this_thread::sleep_for(std::chrono::seconds(1));
+  //
+  // ROS_INFO_STREAM("MOVING TO APPROACH");
+  // moveit_control.goPreset("approach");
+  // ROS_INFO_STREAM("DONE MOVING TO APPROACH!!!!!");
+  // std::this_thread::sleep_for(std::chrono::seconds(1));
+  //
+  // ROS_INFO_STREAM("MOVING TO GRIPPER TO SODA CAN PRESET");
+  // moveit_control.goPresetGripper("soda_can");
+  // ROS_INFO_STREAM("DONE MOVING TO GRIPPER TO SODA CAN PRESET!!!!!");
+  //
+  // ROS_WARN_STREAM("ATTACHING CAN PEPSI");
+  // moveit_control.attachGazeboModel("Coke1", "link");
+  // ROS_WARN_STREAM("FINISHED ATTACHING CAN PEPSI");
+  //
+  // ROS_INFO_STREAM("MOVING TO HOVER AGAIN");
+  // moveit_control.goPreset("hover");
+  // ROS_INFO_STREAM("DONE MOVING TO HOVER AGAIN!!!!!");
+  // std::this_thread::sleep_for(std::chrono::seconds(1));
+  //
+  // auto exec1 = std::thread([&](){
+  //   ROS_WARN_STREAM("OPENING GRIPPER");
+  //   moveit_control.goPresetGripper("open");
+  //   ROS_WARN_STREAM("FINISHED OPENING GRIPPER");
+  // });
+  //
+  // auto exec2 = std::thread([&](){
+  //   ROS_WARN_STREAM("DETACHING CAN PEPSI");
+  //   moveit_control.detachGazeboModel("Coke1", "link");
+  //   ROS_WARN_STREAM("FINISHED DETACHING CAN PEPSI");
+  // });
+  //
+  // if (exec1.joinable()) exec1.join();
+  // if (exec2.joinable()) exec2.join();
 
   moveit_control.printUsefulInfo();
 
