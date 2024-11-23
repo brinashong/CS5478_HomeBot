@@ -36,6 +36,27 @@
             </plugin>
         </gazebo>
 
+        <gazebo reference="${prefix}right_outer_knuckle_joint">
+          <material value="Gazebo/White"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}left_inner_knuckle_joint">
+          <material value="Gazebo/White"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}right_inner_knuckle_joint">
+        <material value="Gazebo/White"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}left_inner_finger_joint">
+        <material value="Gazebo/White"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}right_inner_finger_joint">
+          <material value="Gazebo/White"/>
+        </gazebo>
+
     </xacro:macro>
+
 
 </robot>
