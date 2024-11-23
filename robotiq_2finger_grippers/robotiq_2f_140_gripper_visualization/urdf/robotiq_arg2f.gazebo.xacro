@@ -36,24 +36,44 @@
             </plugin>
         </gazebo>
 
-        <gazebo reference="${prefix}right_outer_knuckle_joint">
-          <material value="Gazebo/White"/>
+        <gazebo reference="${prefix}right_outer_knuckle">
+          <material value="Gazebo/Black"/>
         </gazebo>
 
-        <gazebo reference="${prefix}left_inner_knuckle_joint">
-          <material value="Gazebo/White"/>
+        <gazebo reference="${prefix}left_outer_knuckle">
+          <material value="Gazebo/Black"/>
         </gazebo>
 
-        <gazebo reference="${prefix}right_inner_knuckle_joint">
-        <material value="Gazebo/White"/>
+        <gazebo reference="${prefix}right_inner_knuckle">
+        <material value="Gazebo/Black"/>
         </gazebo>
 
-        <gazebo reference="${prefix}left_inner_finger_joint">
-        <material value="Gazebo/White"/>
+        <gazebo reference="${prefix}left_inner_knuckle">
+          <material value="Gazebo/Black"/>
         </gazebo>
 
-        <gazebo reference="${prefix}right_inner_finger_joint">
-          <material value="Gazebo/White"/>
+        <gazebo reference="${prefix}left_inner_finger">
+        <material value="Gazebo/Black"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}right_inner_finger">
+          <material value="Gazebo/Black"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}left_outer_finger">
+          <material value="Gazebo/Black"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}right_outer_finger">
+          <material value="Gazebo/Black"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}right_inner_finger_pad">
+          <material value="Gazebo/Black"/>
+        </gazebo>
+
+        <gazebo reference="${prefix}left_inner_finger_pad">
+          <material value="Gazebo/Black"/>
         </gazebo>
 
     </xacro:macro>
