@@ -1,5 +1,4 @@
 #include "rviz_homebot_panel/homebot_panel.hpp"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS(rviz_panel::HomebotPanel, rviz::Panel)
@@ -25,14 +24,6 @@ namespace rviz_panel
     sent_goal = false;
 
     zone_ = ui_->comboBox->currentText().toStdString();
-    goal_.header.frame_id = "map";
-    goal_.pose.position.x = 2.645;
-    goal_.pose.position.y = -1.667;
-    goal_.pose.position.z = 0.0;
-    tf2::Quaternion quat;
-    quat.setRPY(0.0, 0.0, -1.57);
-    quat.normalize();
-    goal_.pose.orientation = tf2::toMsg(quat);
 
     connect(ui_->pushButton, SIGNAL(clicked()), this, SLOT(button()));
     connect(ui_->comboBox, SIGNAL(currentTextChanged(QString)), this, SLOT(comboBox()));
@@ -85,9 +76,6 @@ namespace rviz_panel
     {
       srv.request.active = true;
       srv.request.zone = zone_;
-      srv.request.goal = goal_;
-
-      std::cout << "sent: " << goal_.pose.position.x << " " << goal_.pose.position.y << std::endl;
 
       if (goal_srv_client_.call(srv) && srv.response.success)
       {
@@ -105,27 +93,10 @@ namespace rviz_panel
   void HomebotPanel::comboBox()
   {
     auto cleaning_zone = ui_->comboBox->currentText().toStdString();
-    tf2::Quaternion quat;
 
-    if (cleaning_zone == "Coffee Table")
+    if (cleaning_zone == "Coffee Table" || cleaning_zone == "Dining Table")
     {
       zone_ = cleaning_zone;
-      goal_.pose.position.x = 2.645;
-      goal_.pose.position.y = -1.667;
-      goal_.pose.position.z = 0.0;
-      quat.setRPY(0.0, 0.0, -1.57);
-      quat.normalize();
-      goal_.pose.orientation = tf2::toMsg(quat);
-    }
-    else if (cleaning_zone == "Dining Table")
-    {
-      zone_ = cleaning_zone;
-      goal_.pose.position.x = 5.28;
-      goal_.pose.position.y = 0.98;
-      goal_.pose.position.z = 0.0;
-      quat.setRPY(0.0, 0.0, 1.57);
-      quat.normalize();
-      goal_.pose.orientation = tf2::toMsg(quat);
     }
     else
     {

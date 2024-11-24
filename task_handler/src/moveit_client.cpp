@@ -432,26 +432,85 @@ namespace moveit_control
     return approx_target;
   }
 
-  void MoveItClient::hoverArm(const geometry_msgs::PoseStamped& target_pose)
+  bool MoveItClient::hoverArm(const geometry_msgs::PoseStamped& target_pose)
   {
-    if (!initCheck()) return;
+    if (!initCheck()) return false;
+
+    std::cout << "target pose: " << target_pose.pose << std::endl;
 
     auto transformed_pose = getPoseInPlanningFrame(target_pose);
-    if (!transformed_pose.has_value()) return;
+    if (!transformed_pose.has_value()) return false;
 
-    transformed_pose->pose.position.z += 0.1; // 10cm above
-    control_->setApproximateJointValueTarget(poseMsgToEigen(transformed_pose.value().pose), control_->getEndEffectorLink());
+    transformed_pose->pose.position.z += 0.25;
+    std::cout << "transformed pose: " << transformed_pose->pose << std::endl;
 
-    if (moveit::planning_interface::MoveGroupInterface::Plan plan;
-        control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
+    // movePoseWithConstraints(transformed_pose->pose.position.x, transformed_pose->pose.position.y, transformed_pose->pose.position.z);
+
+    auto tries = 0;
+    double dist;
+    do
     {
-      control_->execute(plan);
-    }
-    else
-    {
-      ROS_ERROR_STREAM(__func__ << ": Failed to plan to target");
-    }
+      auto eef = control_->getCurrentPose(end_effector_link_);
+      dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
+      std::cout << "dist: " << dist << std::endl;
+
+      auto joint_values = control_->getCurrentJointValues();
+      dist += joint_values[1];
+      dist += joint_values[2];
+      dist += joint_values[3];
+      dist += joint_values[4];
+
+      std::array<double, 4> arm_values;
+      for (auto &v : arm_values)
+      {
+        if (dist >= 0.13)
+        {
+          v = 0.13;
+        }
+        else
+        {
+          v = std::max(0.0, dist);
+        }
+        dist -= v;
+        std::cout << "dist: " << dist << std::endl;
+      }
+      joint_values = {transformed_pose->pose.position.z, arm_values[0], arm_values[1], arm_values[2], arm_values[3], -1.57};
+      moveJoints(joint_values);
+      // auto eef = control_->getCurrentPose(end_effector_link_);
+      eef = control_->getCurrentPose(end_effector_link_);
+      std::cout << "eef: " << eef << std::endl;
+      dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
+      std::cout << "try #" << tries << std::endl;
+      std::cout << "dist: " << dist << std::endl;
+    } while ( dist > 0.05 && tries++ < 10);
+
+    // control_->setApproximateJointValueTarget(transformed_pose->pose, end_effector_link_);
+    //
+    // double dist;
+    // int tries = 0;
+    // do
+    // {
+    //   if (moveit::planning_interface::MoveGroupInterface::Plan plan;
+    //       control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
+    //   {
+    //     control_->execute(plan);
+    //   }
+    //   else
+    //   {
+    //     ROS_ERROR_STREAM(__func__ << ": Failed to plan to target");
+    //   }
+      // auto eef = control_->getCurrentPose(end_effector_link_);
+      // eef = control_->getCurrentPose(end_effector_link_);
+      // std::cout << "eef: " << eef << std::endl;
+      // dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
+      // std::cout << "try #" << tries << std::endl;
+      // std::cout << "dist: " << dist << std::endl;
+    // } while ( dist > 0.05 && tries++ < 10);
+
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // return true;
+    return (dist <= 0.05 ? true : false);
   }
 
   void MoveItClient::approachArm(const geometry_msgs::PoseStamped& target_pose)
@@ -461,18 +520,50 @@ namespace moveit_control
     auto transformed_pose = getPoseInPlanningFrame(target_pose);
     if (!transformed_pose.has_value()) return;
 
-    control_->setApproximateJointValueTarget(poseMsgToEigen(transformed_pose.value().pose), control_->getEndEffectorLink());
+    transformed_pose->pose.position.z += 0.05;
+    // control_->setApproximateJointValueTarget(transformed_pose->pose, end_effector_link_);
 
-    if (moveit::planning_interface::MoveGroupInterface::Plan plan;
-        control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
-    {
-      control_->execute(plan);
-    }
-    else
-    {
-      ROS_ERROR_STREAM(__func__ << ": Failed to plan to target");
-    }
+    auto joint_values = control_->getCurrentJointValues();
+    joint_values[0] = transformed_pose->pose.position.z;
+    moveJoints(joint_values);
+
+    // std::cout << "transformed pose: " << transformed_pose->pose << std::endl;
+
+    // double dist;
+    // int tries = 0;
+    // do
+    // {
+    //   if (moveit::planning_interface::MoveGroupInterface::Plan plan;
+    //       control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
+    //   {
+    //     control_->execute(plan);
+    //   }
+    //   else
+    //   {
+    //     ROS_ERROR_STREAM(__func__ << ": Failed to plan to target");
+    //   }
+    //   auto eef = control_->getCurrentPose(end_effector_link_);
+    //   // std::cout << "eef: " << eef << std::endl;
+    //   dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
+    //   // std::cout << "try #" << tries << std::endl;
+    //   // std::cout << "dist: " << dist << std::endl;
+    // } while ( dist > 0.05 && tries++ < 10);
+
+    // auto curr_pose = control_->getCurrentPose(end_effector_link_);
+    // auto z = curr_pose.pose.position.z - 0.15;
+    // moveZWithCurrentPose(z);
+
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+
+  void MoveItClient::cancel()
+  {
+    control_->stop();
+    gripper_control_->stop();
+    camera_control_->stop();
+
+    goPreset("home_low");
+    goPresetGripper("open");
   }
 
   void MoveItClient::goPreset(const std::string& target)
@@ -590,7 +681,7 @@ namespace moveit_control
     // Get robot current state
     auto curr_state = control_->getCurrentState();
 
-    // // Create joint value container
+    // Create joint value container
     std::vector<double> joint_values;
 
     if (curr_state->setFromIK(joint_model_group_, curr_pose.pose))

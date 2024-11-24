@@ -9,7 +9,7 @@ int main(int argc, char** argv)
 
   std::shared_ptr<TaskHandler> obj = std::make_shared<TaskHandler>(nh, pnh);
 
-  ros::MultiThreadedSpinner spinner(2);
+  ros::MultiThreadedSpinner spinner(3);
   spinner.spin();
 
   return 0;

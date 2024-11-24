@@ -14,6 +14,7 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/AttachedCollisionObject.h>
 #include <moveit_msgs/CollisionObject.h>
+#include <moveit/robot_state/robot_state.h>
 #include <string>
 #include <tf2/LinearMath/Quaternion.h>
 
@@ -99,9 +100,11 @@ namespace moveit_control
 
     Eigen::Isometry3d poseMsgToEigen(const geometry_msgs::Pose& msg);
 
-    void hoverArm(const geometry_msgs::PoseStamped& target_pose);
+    bool hoverArm(const geometry_msgs::PoseStamped& target_pose);
 
     void approachArm(const geometry_msgs::PoseStamped& target_pose);
+
+    void cancel();
 
     void goPreset(const std::string& target);
 

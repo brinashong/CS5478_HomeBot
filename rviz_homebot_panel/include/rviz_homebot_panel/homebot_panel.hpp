@@ -7,8 +7,6 @@
 #include <std_srvs/SetBool.h>
 #include <std_msgs/String.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <tf2/LinearMath/Quaternion.h>
-#include <geometry_msgs/Quaternion.h>
 
 #include <QString>
 #include <ui_homebot_panel.h>
@@ -41,6 +39,7 @@ namespace rviz_panel
 
     protected:
       std::shared_ptr<Ui::HomebotPanel> ui_;
+
       // ROS declaration
       ros::NodeHandle nh_;
       ros::Subscriber state_sub_;
@@ -50,7 +49,6 @@ namespace rviz_panel
 
       bool sent_goal;
       std::string zone_;
-      geometry_msgs::PoseStamped goal_;
   };
 } // rviz_panel
 

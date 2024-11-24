@@ -1,6 +1,5 @@
 bool active
 string zone
-geometry_msgs/PoseStamped goal
 ---
 bool success
 string message
