@@ -20,7 +20,7 @@ if [ $? != 0 ]; then
   # perfect loc
   tmux split-window -h -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'rosrun task_handler tf_handler_node'
+  tmux send-keys -t stretch_sim 'roslaunch task_handler tf.launch'
   tmux select-layout tiled
 
   # moveit
@@ -32,7 +32,7 @@ if [ $? != 0 ]; then
   # task handler
   tmux split-window -h -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'roslaunch task_handler tf.launch'
+  tmux send-keys -t stretch_sim 'rosrun task_handler task_handler_node'
   tmux select-layout tiled
 
   # perception image capture

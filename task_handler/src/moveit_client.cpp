@@ -464,56 +464,33 @@ namespace moveit_control
   {
     if (!initCheck()) return false;
 
-    std::cout << "target pose: " << target_pose.pose << std::endl;
-
     auto transformed_pose = getPoseInPlanningFrame(target_pose);
     if (!transformed_pose.has_value()) return false;
 
     transformed_pose->pose.position.z += 0.2;
-    std::cout << "transformed pose: " << transformed_pose->pose << std::endl;
 
-    // movePoseWithConstraints(transformed_pose->pose.position.x, transformed_pose->pose.position.y, transformed_pose->pose.position.z);
-
-    // auto tries = 0;
     double dist;
-    // do
-    // {
-      auto eef = control_->getCurrentPose(end_effector_link_);
-      // auto eef = getGazeboLinkPose("link_wrist_yaw");
-      dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
-      // dist = std::hypot(eef->position.x - transformed_pose->pose.position.x, eef->position.y - transformed_pose->pose.position.y);
-      std::cout << "dist: " << dist << std::endl;
+    auto eef = control_->getCurrentPose(end_effector_link_);
+    dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
 
-      auto joint_values = control_->getCurrentJointValues();
-      // dist += joint_values[1];
-      // dist += joint_values[2];
-      // dist += joint_values[3];
-      // dist += joint_values[4];
+    auto joint_values = control_->getCurrentJointValues();
 
-      std::array<double, 4> arm_values;
-      for (auto &v : arm_values)
+    std::array<double, 4> arm_values;
+    for (auto &v : arm_values)
+    {
+      if (dist >= 0.13)
       {
-        if (dist >= 0.13)
-        {
-          v = 0.13;
-        }
-        else
-        {
-          v = std::max(0.0, dist);
-        }
-        dist -= v;
-        std::cout << "dist: " << dist << std::endl;
+        v = 0.13;
       }
-      joint_values = {transformed_pose->pose.position.z, arm_values[0], arm_values[1], arm_values[2], arm_values[3], -1.57};
-      moveJoints(joint_values);
-      // eef = control_->getCurrentPose(end_effector_link_);
-      // eef = getGazeboLinkPose("link_wrist_yaw");
-      // std::cout << "eef: " << eef.value() << std::endl;
-      // dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
-      // dist = std::hypot(eef->position.x - transformed_pose->pose.position.x, eef->position.y - transformed_pose->pose.position.y);
-    //   std::cout << "try #" << tries << std::endl;
-    //   std::cout << "dist: " << dist << std::endl;
-    // } while ( dist > 0.05 && tries++ < 10);
+      else
+      {
+        v = std::max(0.0, dist);
+      }
+      dist -= v;
+      std::cout << "dist: " << dist << std::endl;
+    }
+    joint_values = {transformed_pose->pose.position.z, arm_values[0], arm_values[1], arm_values[2], arm_values[3], -1.57};
+    moveJoints(joint_values);
 
     // control_->setApproximateJointValueTarget(transformed_pose->pose, end_effector_link_);
     //
@@ -540,8 +517,8 @@ namespace moveit_control
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    // return true;
-    return (dist <= 0.05 ? true : false);
+    return true;
+    // return (dist <= 0.05 ? true : false);
   }
 
   void MoveItClient::approachArm(const geometry_msgs::PoseStamped& target_pose)
@@ -557,32 +534,6 @@ namespace moveit_control
     auto joint_values = control_->getCurrentJointValues();
     joint_values[0] = transformed_pose->pose.position.z;
     moveJoints(joint_values);
-
-    // std::cout << "transformed pose: " << transformed_pose->pose << std::endl;
-
-    // double dist;
-    // int tries = 0;
-    // do
-    // {
-    //   if (moveit::planning_interface::MoveGroupInterface::Plan plan;
-    //       control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
-    //   {
-    //     control_->execute(plan);
-    //   }
-    //   else
-    //   {
-    //     ROS_ERROR_STREAM(__func__ << ": Failed to plan to target");
-    //   }
-    //   auto eef = control_->getCurrentPose(end_effector_link_);
-    //   // std::cout << "eef: " << eef << std::endl;
-    //   dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
-    //   // std::cout << "try #" << tries << std::endl;
-    //   // std::cout << "dist: " << dist << std::endl;
-    // } while ( dist > 0.05 && tries++ < 10);
-
-    // auto curr_pose = control_->getCurrentPose(end_effector_link_);
-    // auto z = curr_pose.pose.position.z - 0.15;
-    // moveZWithCurrentPose(z);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }

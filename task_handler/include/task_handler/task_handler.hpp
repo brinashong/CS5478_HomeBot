@@ -59,7 +59,6 @@ private:
   void pickObject();
   void placeObject();
   geometry_msgs::PoseStamped getApproachPose(const geometry_msgs::PoseStamped& goal_pose, const geometry_msgs::Pose& obj_pose);
-  void rotateAlign();
 
   ros::NodeHandle nh_;
   ros::Subscriber result_sub_;

@@ -71,7 +71,6 @@ TaskHandler::~TaskHandler()
 
 void TaskHandler::init()
 {
-  // Init gripper
   moveit_control_->goPresetGripper("closed");
   moveit_control_->goPresetGripper("open");
   moveit_control_->goPresetCamera("homebot");
@@ -96,7 +95,7 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
     res.message = "Goal sent";
 
     curr_state_ = State::GO_TO_GOAL;
-    state_str_.data = "Go to goal";
+    state_str_.data = "Go to Cleaning Zone";
     state_pub_.publish(state_str_);
     task_str_.data = "Executing plan...";
     task_pub_.publish(task_str_);
@@ -117,7 +116,6 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
     marker.color.b = 0.0;
     goal_pub_.publish(marker);
 
-    // TEMP
     std::queue<task_handler::Object> empty;
     std::swap( objects_, empty );
     std::queue<geometry_msgs::PoseStamped> empty_pose;
@@ -127,11 +125,11 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
     {
       auto goal_pose = zone_goal_map_[req.zone];
 
-      auto pose = moveit_control_->getGazeboModelPose("Coke2");
+      auto pose = moveit_control_->getGazeboModelPose("Coke");
       if (pose.has_value())
       {
         obj.id = "soda_can";
-        obj.name = "Coke2";
+        obj.name = "Coke";
         obj.pose = pose.value();
         obj.pose.position.z += 0.07;
         objects_.push(obj);
@@ -141,22 +139,11 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
         objects_approach_goals_.push(res);
       }
 
-      // pose = moveit_control_->getGazeboModelPose("Coke1");
-      // if (pose.has_value())
-      // {
-      //   obj.id = "soda_can";
-      //   obj.name = "Coke1";
-      //   obj.pose = pose.value();
-      //   obj.pose.position.z += 0.07;
-      //   objects_.push(obj);
-      //   objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
-      // }
-
-      pose = moveit_control_->getGazeboModelPose("LivingRoomMug");
+      pose = moveit_control_->getGazeboModelPose("Mug");
       if (pose.has_value())
       {
         obj.id = "cup";
-        obj.name = "LivingRoomMug";
+        obj.name = "Mug";
         obj.pose = pose.value();
         obj.pose.position.z += 0.08;
         objects_.push(obj);
@@ -167,13 +154,13 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
     {
       auto goal_pose = zone_goal_map_[req.zone];
 
-      auto pose = moveit_control_->getGazeboModelPose("SonyBox");
+      auto pose = moveit_control_->getGazeboModelPose("Book2");
       if (pose.has_value())
       {
         obj.id = "book";
-        obj.name = "SonyBox";
+        obj.name = "Book2";
         obj.pose = pose.value();
-        obj.pose.position.z += 0.1;
+        obj.pose.position.z += 0.13;
         objects_.push(obj);
         objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
       }
@@ -184,7 +171,7 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
         obj.id = "book";
         obj.name = "Book";
         obj.pose = pose.value();
-        obj.pose.position.z += 0.1;
+        obj.pose.position.z += 0.13;
         objects_.push(obj);
         objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
       }
@@ -245,7 +232,6 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
         task_str_.data = "Detecting objects...";
         task_pub_.publish(task_str_);
 
-        // TEMP
         curr_state_ = State::GO_TO_OBJECT;
         state_str_.data = "Go to object";
         state_pub_.publish(state_str_);
@@ -281,13 +267,10 @@ void TaskHandler::initLookups()
   /**
    * Object List
    ===========
-   - KitchenMug
-   - KitchenBowl
-   - SonyBox
    - Book
-   - Coke1
-   - Coke2
-   - LivingRoomMug 
+   - Book2
+   - Coke
+   - Mug 
    */
 
   // initialize the target locations for each object of interest
@@ -298,30 +281,13 @@ void TaskHandler::initLookups()
   geometry_msgs::PoseStamped pose;
   pose.header.frame_id = "map";
 
-  // sink position 1
-  pose.pose.position.x = 8.01;
-  pose.pose.position.y = -4.475;
-  pose.pose.position.z = 1.5;
-  pose.pose.orientation.w = 1.0;
-  object_location_map_["KitchenMug"] = "sink";
-  object_target_map_["KitchenMug"] = pose;
-  pose.pose.position.y = -4.475;
-
-  // sink position 2
-  pose.pose.position.x = 8.01;
-  pose.pose.position.y = -4.35;
-  pose.pose.position.z = 1.5;
-  pose.pose.orientation.w = 1.0;
-  object_location_map_["KitchenBowl"] = "sink";
-  object_target_map_["KitchenBowl"] = pose;
-
-  // sink position 3
+  // sink position
   pose.pose.position.x = 8.03;
   pose.pose.position.y = -5.13;
-  pose.pose.position.z = 0.85;
+  pose.pose.position.z = 0.8;
   pose.pose.orientation.w = 1.0;
-  object_location_map_["LivingRoomMug"] = "sink";
-  object_target_map_["LivingRoomMug"] = pose;
+  object_location_map_["Mug"] = "sink";
+  object_target_map_["Mug"] = pose;
   pose.pose.position.y = -4.43;
   pose.pose.position.z = 0.0;
   robot_target_map_["sink"] = pose;
@@ -331,8 +297,8 @@ void TaskHandler::initLookups()
   pose.pose.position.y = -5.182;
   pose.pose.position.z = 0.85;
   pose.pose.orientation.w = 1.0;
-  object_location_map_["SonyBox"] = "book shelf";
-  object_target_map_["SonyBox"] = pose;
+  object_location_map_["Book2"] = "book shelf";
+  object_target_map_["Book2"] = pose;
   pose.pose.position.y = -4.64;
   pose.pose.position.z = 0.0;
   robot_target_map_["book shelf"] = pose;
@@ -354,10 +320,8 @@ void TaskHandler::initLookups()
   pose.pose.position.z = 0.6;
   pose.pose.orientation.z = -0.7;
   pose.pose.orientation.w = 0.71;
-  object_location_map_["Coke1"] = "bin";
-  object_location_map_["Coke2"] = "bin";
-  object_target_map_["Coke1"] = pose;
-  object_target_map_["Coke2"] = pose;
+  object_location_map_["Coke"] = "bin";
+  object_target_map_["Coke"] = pose;
   pose.pose.position.x = 2.8;
   pose.pose.position.z = 0.0;
   robot_target_map_["bin"] = pose;
@@ -411,77 +375,39 @@ void TaskHandler::pickObject()
   geometry_msgs::PoseStamped object_stamped;
   object_stamped.header.frame_id = "map";
   object_stamped.header.stamp = ros::Time::now();
+  object_stamped.pose = object.pose;
 
-  // moveit_msgs::CollisionObject collision_object;
-  // collision_object.id = object.name;
-  // collision_object.header.frame_id = "world";
-  //
-  // // Define the object's shape and dimensions
-  // shape_msgs::SolidPrimitive primitive;
-  // primitive.type = primitive.BOX;
-  // primitive.dimensions = {0.15, 0.228, 0.035}; // Width, height, depth
-  //
-  // // Define the object's pose
-  // geometry_msgs::Pose object_pose;
-  // object_pose.position.x = 5.781;
-  // object_pose.position.y = 0.695;
-  // object_pose.position.z = 0.8;
-  // object_pose.orientation.z = 0.71;
-  // object_pose.orientation.w = 0.71;
-  //
-  // collision_object.primitives.push_back(primitive);
-  // collision_object.primitive_poses.push_back(object_pose);
-  // collision_object.operation = collision_object.ADD;
-  //
-  // moveit_control_->addCollision(collision_object);
-
-  task_str_.data = "Going to arm home position...";
+  task_str_.data = "Going to high arm position...";
   task_pub_.publish(task_str_);
   moveit_control_->goPreset("home_high");
-  task_str_.data = "Hovering arm...";
+
+  task_str_.data = "Hovering arm above object...";
   task_pub_.publish(task_str_);
-  object_stamped.pose = object.pose;
-  if (!moveit_control_->hoverArm(object_stamped))
-  {
-    // temp abort
-    ac_->cancelAllGoals();
-    moveit_control_->cancel();
+  moveit_control_->hoverArm(object_stamped);
 
-    curr_state_ = State::IDLE;
-    state_str_.data = "Idle";
-    state_pub_.publish(state_str_);
-    task_str_.data = "Failed to pick. Aborting...";
-    task_pub_.publish(task_str_);
-
-    std_srvs::SetBool srv;
-    srv.request.data = true;
-    ros::Rate rate(1);
-    while (ros::ok() && !reset_srv_client_.call(srv))
-    {
-      ROS_INFO_STREAM("Waiting to reset...");
-      rate.sleep();
-    }
-    return;
-  }
-  task_str_.data = "Arm approaching...";
+  task_str_.data = "Arm approaching object...";
   task_pub_.publish(task_str_);
   moveit_control_->approachArm(object_stamped);
+
   task_str_.data = "Closing gripper...";
   task_pub_.publish(task_str_);
   moveit_control_->goPresetGripper(object.id);
-  task_str_.data = "Picking up...";
+
+  task_str_.data = "Picking up object...";
   task_pub_.publish(task_str_);
   moveit_control_->attachGazeboModel(object.name, "link");
-  // task_str_.data = "Hovering arm...";
-  // task_pub_.publish(task_str_);
-  // moveit_control_->hoverArm(object_stamped);
-  task_str_.data = "Going to arm home position...";
+
+  task_str_.data = "Hovering arm...";
+  task_pub_.publish(task_str_);
+  moveit_control_->hoverArm(object_stamped);
+
+  task_str_.data = "Going to high arm position...";
   task_pub_.publish(task_str_);
   moveit_control_->goPreset("home_high");
 
   // once done picking
   curr_state_ = State::GO_TO_TARGET_LOC;
-  state_str_.data = "Go to Target";
+  state_str_.data = "Go to Object Destination";
   state_pub_.publish(state_str_);
 
   auto target_pose = robot_target_map_[object_location_map_[object.name]];
@@ -490,7 +416,7 @@ void TaskHandler::pickObject()
   move_base_msgs::MoveBaseGoal goal;
   goal.target_pose = target_pose;
 
-  ROS_INFO_STREAM("Sending target destination: " << object_location_map_[object.name]);
+  ROS_INFO_STREAM("Sending destination: " << object_location_map_[object.name]);
 
   ac_->sendGoal(goal);
 
@@ -511,10 +437,12 @@ void TaskHandler::placeObject()
   task_str_.data = "Hovering arm...";
   task_pub_.publish(task_str_);
   moveit_control_->hoverArm(target_pose);
-  task_str_.data = "Arm approaching...";
+
+  task_str_.data = "Lowering arm...";
   task_pub_.publish(task_str_);
   moveit_control_->approachArm(target_pose);
-  task_str_.data = "Placing down...";
+
+  task_str_.data = "Placing down object...";
   task_pub_.publish(task_str_);
   auto exec1 = std::thread([&](){
     moveit_control_->goPresetGripper("open");
@@ -530,20 +458,23 @@ void TaskHandler::placeObject()
   task_str_.data = "Hovering arm...";
   task_pub_.publish(task_str_);
   moveit_control_->hoverArm(target_pose);
-  task_str_.data = "Going to arm home position...";
+
+  task_str_.data = "Going to high arm position...";
   task_pub_.publish(task_str_);
   moveit_control_->goPreset("home_high");
+
+  task_str_.data = "Going to low arm position...";
+  task_pub_.publish(task_str_);
   moveit_control_->goPreset("home_low");
 
   // once done placing
-  moveit_control_->removeCollision(objects_.front().name);
   objects_.pop();
   objects_approach_goals_.pop();
   if (!objects_.empty())
   {
     // send the next object
     curr_state_ = State::GO_TO_OBJECT;
-    state_str_.data = "Go to object";
+    state_str_.data = "Go to next object";
     state_pub_.publish(state_str_);
     sendObjectGoal();
   }
@@ -599,22 +530,3 @@ geometry_msgs::PoseStamped TaskHandler::getApproachPose(const geometry_msgs::Pos
   return approach_pose;
 }
 
-void TaskHandler::rotateAlign()
-{
-  // geometry_msgs::Twist cmd_vel;
-  //
-  // double angle_diff = angles::shortest_angular_distance(-1.57, tf2::getYaw(goal_pose_.pose.orientation));
-  //
-  //             if (std::abs(angle) > yaw_goal_tolerance_)
-  //           {
-  //               robot_stopped_ = false;
-  //               cmd_vel.twist.angular.z = angle < 0 ? -max_ang_vel_ : max_ang_vel_;
-  //           }
-  //
-  // while (angle_diff > 0.01)
-  // {
-  //
-  // }
-
-  // cmd_vel_pub_.publish(cmd_vel);
-}
