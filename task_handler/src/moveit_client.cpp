@@ -76,6 +76,7 @@ namespace moveit_control
 
     gz_get_client_ = n_.serviceClient<gazebo_msgs::GetModelState>("/gazebo/get_model_state");
     gz_set_client_ = n_.serviceClient<gazebo_msgs::SetModelState>("/gazebo/set_model_state");
+    gz_link_client_ = n_.serviceClient<gazebo_msgs::GetLinkState>("/gazebo/get_link_state");
 
     attach_gz_client_ = n_.serviceClient<gazebo_ros_link_attacher::Attach>("/link_attacher_node/attach");
     detach_gz_client_ = n_.serviceClient<gazebo_ros_link_attacher::Attach>("/link_attacher_node/detach");
@@ -353,6 +354,33 @@ namespace moveit_control
     }
   }
 
+  std::optional<geometry_msgs::Pose> MoveItClient::getGazeboLinkPose(const std::string& object_id)
+  {
+    gazebo_msgs::GetLinkState link_state_msg;
+    link_state_msg.request.link_name = object_id;
+
+    // Call get gazebo model service
+    if (gz_link_client_.call(link_state_msg))
+    {
+      if (link_state_msg.response.success)
+      {
+        ROS_INFO_STREAM(__func__ << ": Link " << object_id << " pose obtained!");
+        return {link_state_msg.response.link_state.pose};
+      }
+      else
+      {
+        ROS_ERROR_STREAM(__func__ << ": Failed to find link "
+            << object_id);
+        return std::nullopt;
+      }
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to call Gazebo get link service");
+      return std::nullopt;
+    }
+  }
+
   bool MoveItClient::setGazeboModelPose(
       const std::string& object_id,
       const geometry_msgs::Pose& pose,
@@ -441,24 +469,26 @@ namespace moveit_control
     auto transformed_pose = getPoseInPlanningFrame(target_pose);
     if (!transformed_pose.has_value()) return false;
 
-    transformed_pose->pose.position.z += 0.25;
+    transformed_pose->pose.position.z += 0.2;
     std::cout << "transformed pose: " << transformed_pose->pose << std::endl;
 
     // movePoseWithConstraints(transformed_pose->pose.position.x, transformed_pose->pose.position.y, transformed_pose->pose.position.z);
 
-    auto tries = 0;
+    // auto tries = 0;
     double dist;
-    do
-    {
+    // do
+    // {
       auto eef = control_->getCurrentPose(end_effector_link_);
+      // auto eef = getGazeboLinkPose("link_wrist_yaw");
       dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
+      // dist = std::hypot(eef->position.x - transformed_pose->pose.position.x, eef->position.y - transformed_pose->pose.position.y);
       std::cout << "dist: " << dist << std::endl;
 
       auto joint_values = control_->getCurrentJointValues();
-      dist += joint_values[1];
-      dist += joint_values[2];
-      dist += joint_values[3];
-      dist += joint_values[4];
+      // dist += joint_values[1];
+      // dist += joint_values[2];
+      // dist += joint_values[3];
+      // dist += joint_values[4];
 
       std::array<double, 4> arm_values;
       for (auto &v : arm_values)
@@ -476,13 +506,14 @@ namespace moveit_control
       }
       joint_values = {transformed_pose->pose.position.z, arm_values[0], arm_values[1], arm_values[2], arm_values[3], -1.57};
       moveJoints(joint_values);
-      // auto eef = control_->getCurrentPose(end_effector_link_);
-      eef = control_->getCurrentPose(end_effector_link_);
-      std::cout << "eef: " << eef << std::endl;
-      dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
-      std::cout << "try #" << tries << std::endl;
-      std::cout << "dist: " << dist << std::endl;
-    } while ( dist > 0.05 && tries++ < 10);
+      // eef = control_->getCurrentPose(end_effector_link_);
+      // eef = getGazeboLinkPose("link_wrist_yaw");
+      // std::cout << "eef: " << eef.value() << std::endl;
+      // dist = std::hypot(eef.pose.position.x - transformed_pose->pose.position.x, eef.pose.position.y - transformed_pose->pose.position.y);
+      // dist = std::hypot(eef->position.x - transformed_pose->pose.position.x, eef->position.y - transformed_pose->pose.position.y);
+    //   std::cout << "try #" << tries << std::endl;
+    //   std::cout << "dist: " << dist << std::endl;
+    // } while ( dist > 0.05 && tries++ < 10);
 
     // control_->setApproximateJointValueTarget(transformed_pose->pose, end_effector_link_);
     //
@@ -576,6 +607,24 @@ namespace moveit_control
         control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
     {
       control_->execute(plan);
+    }
+    else
+    {
+      ROS_ERROR_STREAM(__func__ << ": Failed to plan to target \"" << target << "\" positions." );
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+
+  void MoveItClient::goPresetCamera(const std::string& target)
+  {
+    if (!initCheck()) return;
+
+    camera_control_->setNamedTarget(target);
+
+    if (moveit::planning_interface::MoveGroupInterface::Plan plan;
+        camera_control_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS)
+    {
+      camera_control_->execute(plan);
     }
     else
     {

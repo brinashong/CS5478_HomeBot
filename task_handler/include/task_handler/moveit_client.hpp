@@ -20,6 +20,7 @@
 
 // Gazebo
 #include <gazebo_msgs/ModelState.h>
+#include <gazebo_msgs/GetLinkState.h>
 #include <gazebo_msgs/GetModelState.h>
 #include <gazebo_msgs/SetModelState.h>
 #include "gazebo_ros_link_attacher/Attach.h"
@@ -72,6 +73,11 @@ namespace moveit_control
     bool detachGazeboModel(const std::string& object_id, const std::string& link_name = "link");
 
     /**
+     * \brief Get Gazebo link pose
+     */
+    std::optional<geometry_msgs::Pose> getGazeboLinkPose(const std::string& object_id);
+
+    /**
      * \brief Get Gazebo model pose
      */
     std::optional<geometry_msgs::Pose> getGazeboModelPose(const std::string& object_id);
@@ -107,6 +113,8 @@ namespace moveit_control
     void cancel();
 
     void goPreset(const std::string& target);
+
+    void goPresetCamera(const std::string& target);
 
     void goPresetGripper(const std::string& target);
 
@@ -174,6 +182,7 @@ namespace moveit_control
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
     std::vector<moveit_msgs::JointConstraint> default_joint_contraints_;
 
+    ros::ServiceClient gz_link_client_;
     ros::ServiceClient gz_get_client_;
     ros::ServiceClient gz_set_client_;
     ros::ServiceClient attach_gz_client_;

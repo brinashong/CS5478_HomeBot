@@ -74,6 +74,7 @@ void TaskHandler::init()
   // Init gripper
   moveit_control_->goPresetGripper("closed");
   moveit_control_->goPresetGripper("open");
+  moveit_control_->goPresetCamera("homebot");
 }
 
 bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_handler::GoalTask::Response &res)
@@ -326,32 +327,32 @@ void TaskHandler::initLookups()
 
   // sink position 3
   pose.pose.position.x = 7.51;
-  pose.pose.position.y = -4.45;
-  pose.pose.position.z = 1.2;
+  pose.pose.position.y = -5.13;
+  pose.pose.position.z = 0.7;
   pose.pose.orientation.w = 1.0;
   object_location_map_["LivingRoomMug"] = "sink";
   object_target_map_["LivingRoomMug"] = pose;
-  pose.pose.position.y = -4.5;
+  pose.pose.position.y = -4.40;
   robot_target_map_["sink"] = pose;
 
   // book shelf position 1
-  pose.pose.position.x = 4.43;
-  pose.pose.position.y = -4.7;
+  pose.pose.position.x = 4.407;
+  pose.pose.position.y = -5.182;
   pose.pose.position.z = 0.85;
   pose.pose.orientation.w = 1.0;
   object_location_map_["SonyBox"] = "book shelf";
   object_target_map_["SonyBox"] = pose;
-  pose.pose.position.y = -4.75;
+  pose.pose.position.y = -4.64;
   robot_target_map_["book shelf"] = pose;
 
   // book shelf position 2
-  pose.pose.position.x = 4.135;
-  pose.pose.position.y = -4.7;
+  pose.pose.position.x = 4.142;
+  pose.pose.position.y = -5.182;
   pose.pose.position.z = 0.85;
   pose.pose.orientation.w = 1.0;
   object_location_map_["Book"] = "bookshelf";
   object_target_map_["Book"] = pose;
-  pose.pose.position.y = -4.75;
+  pose.pose.position.y = -4.64;
   robot_target_map_["bookshelf"] = pose;
 
   // bin position
@@ -383,7 +384,7 @@ void TaskHandler::initLookups()
   zone_goal_map_["Coffee Table"] = goal;
 
   // dining table
-  goal.pose.position.x = 5.1;
+  goal.pose.position.x = 5.34;
   goal.pose.position.y = 0.7;
   goal.pose.position.z = 0.0;
   quat.setRPY(0.0, 0.0, 1.57);
