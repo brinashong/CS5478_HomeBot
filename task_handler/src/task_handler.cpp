@@ -175,17 +175,7 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
         obj.pose = pose.value();
         obj.pose.position.z += 0.1;
         objects_.push(obj);
-
-        geometry_msgs::PoseStamped pose;
-        pose.header.frame_id = "map";
-        pose.pose.position.x = 5.256;
-        pose.pose.position.y = 0.73;
-        pose.pose.orientation.x = 0.0;
-        pose.pose.orientation.y = 0.0;
-        pose.pose.orientation.z = 0.71;
-        pose.pose.orientation.w = 0.71;
-        objects_approach_goals_.push(pose);
-        // objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
+        objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
       }
 
       pose = moveit_control_->getGazeboModelPose("Book");
@@ -326,13 +316,14 @@ void TaskHandler::initLookups()
   object_target_map_["KitchenBowl"] = pose;
 
   // sink position 3
-  pose.pose.position.x = 7.51;
+  pose.pose.position.x = 8.03;
   pose.pose.position.y = -5.13;
-  pose.pose.position.z = 0.7;
+  pose.pose.position.z = 0.85;
   pose.pose.orientation.w = 1.0;
   object_location_map_["LivingRoomMug"] = "sink";
   object_target_map_["LivingRoomMug"] = pose;
-  pose.pose.position.y = -4.40;
+  pose.pose.position.y = -4.43;
+  pose.pose.position.z = 0.0;
   robot_target_map_["sink"] = pose;
 
   // book shelf position 1
@@ -343,6 +334,7 @@ void TaskHandler::initLookups()
   object_location_map_["SonyBox"] = "book shelf";
   object_target_map_["SonyBox"] = pose;
   pose.pose.position.y = -4.64;
+  pose.pose.position.z = 0.0;
   robot_target_map_["book shelf"] = pose;
 
   // book shelf position 2
@@ -353,6 +345,7 @@ void TaskHandler::initLookups()
   object_location_map_["Book"] = "bookshelf";
   object_target_map_["Book"] = pose;
   pose.pose.position.y = -4.64;
+  pose.pose.position.z = 0.0;
   robot_target_map_["bookshelf"] = pose;
 
   // bin position
@@ -366,6 +359,7 @@ void TaskHandler::initLookups()
   object_target_map_["Coke1"] = pose;
   object_target_map_["Coke2"] = pose;
   pose.pose.position.x = 2.8;
+  pose.pose.position.z = 0.0;
   robot_target_map_["bin"] = pose;
 
   // initialize goal positions for each cleaning zone

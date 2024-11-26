@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node name="tf_handler_node" pkg="task_handler" type="tf_handler_node" output="screen" />
+
+  <node pkg="tf" type="static_transform_publisher" name="world_to_map" args="0 0 0 0 0 0 world map 1" />
+
+  <node pkg="tf" type="static_transform_publisher" name="map_odom" args="0 0 0 0 0 0 map odom 1" />
+
+</launch>

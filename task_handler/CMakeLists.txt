@@ -172,6 +172,13 @@ target_link_libraries(moveit_client_node
   ${catkin_LIBRARIES}
 )
 
+add_executable(tf_handler_node
+./src/tf_handler.cpp
+)
+target_link_libraries(tf_handler_node
+  ${catkin_LIBRARIES}
+)
+
 #############
 ## Install ##
 #############
