@@ -1,6 +1,6 @@
 #!/bin/bash
 
-WSPATH="$HOME/mcomp_ws/devel/setup.zsh"
+WSPATH="$HOME/ros1_ws/stretch_ws/devel/setup.zsh"
 
 tmux has-session -t stretch_sim 2> /dev/null
 if [ $? != 0 ]; then
@@ -14,7 +14,13 @@ if [ $? != 0 ]; then
   # gazebo nav
   tmux split-window -h -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'sleep 3; roslaunch stretch_navigation navigation_gazebo_robotiq.launch' C-m
+  tmux send-keys -t stretch_sim 'roslaunch stretch_navigation navigation_gazebo_robotiq.launch'
+  tmux select-layout tiled
+
+  # perfect loc
+  tmux split-window -h -t stretch_sim
+  tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
+  tmux send-keys -t stretch_sim 'rosrun task_handler tf_handler_node'
   tmux select-layout tiled
 
   # moveit
@@ -26,7 +32,25 @@ if [ $? != 0 ]; then
   # task handler
   tmux split-window -h -t stretch_sim
   tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
-  tmux send-keys -t stretch_sim 'rosrun task_handler task_handler_node'
+  tmux send-keys -t stretch_sim 'roslaunch task_handler tf.launch'
+  tmux select-layout tiled
+
+  # perception image capture
+  tmux split-window -h -t stretch_sim
+  tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
+  tmux send-keys -t stretch_sim 'roscd task_handler; cd scripts; ./stretch_image_capture.py'
+  tmux select-layout tiled
+
+  # perception detection pub
+  tmux split-window -h -t stretch_sim
+  tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
+  tmux send-keys -t stretch_sim 'roscd task_handler; cd scripts; ./stretch_location_publisher.py'
+  tmux select-layout tiled
+
+  # image view
+  tmux split-window -h -t stretch_sim
+  tmux send-keys -t stretch_sim 'source '$WSPATH C-m 
+  tmux send-keys -t stretch_sim 'rosrun rqt_image_view rqt_image_view'
   tmux select-layout tiled
 
 fi
