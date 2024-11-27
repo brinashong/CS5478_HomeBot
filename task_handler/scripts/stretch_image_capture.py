@@ -29,8 +29,8 @@ class ImageSynchronizer:
         self.image_path = os.path.dirname(os.path.abspath(__file__)) + "/images/"
         self.cleanup_image_path()
 
-        self.stored_depth_images = []
-        self.stored_images = []
+        # self.stored_depth_images = []
+        self.stored_images_index = []
         self.image_index = 0
 
         # Subscribers for color and depth images
@@ -51,12 +51,25 @@ class ImageSynchronizer:
             depth_array = np.array(depth_image, dtype=np.float32)
             depth_array = np.nan_to_num(depth_array)
 
-            normalized_depth = cv2.normalize(depth_array, None, 0, 255, cv2.NORM_MINMAX)
-            depth_colormap = cv2.applyColorMap(normalized_depth.astype(np.uint8), cv2.COLORMAP_JET)
-        
+            # optional: normalize the depth image
+            # normalized_depth = cv2.normalize(depth_array, None, 0, 255, cv2.NORM_MINMAX)
+            # depth_colormap = cv2.applyColorMap(normalized_depth.astype(np.uint8), cv2.COLORMAP_JET)
+
+            depth_colormap = cv2.applyColorMap(depth_array.astype(np.uint8), cv2.COLORMAP_JET)
+
             # Save the image (you can modify the path as needed)
             depth_image_name = "image_depth_" + str(self.image_index) + ".png"
             image_name = "image_" + str(self.image_index) + ".png"
+
+            self.stored_images_index.append(self.image_index)
+
+            # restrict the total number of files in the images and depth_images folders
+            if len(self.stored_images_index) > 500:
+                oldest_file_index  = self.stored_images_index[0]
+                os.remove(self.image_path + "image_" + str(oldest_file_index) + ".png")
+                os.remove(self.image_depth_path + "image_depth_" + str(oldest_file_index) + ".png")
+                self.stored_images_index.pop(0)
+
             cv2.imwrite(self.image_depth_path + depth_image_name, depth_colormap)
             cv2.imwrite(self.image_path + image_name, color_image)
             self.image_index += 1
@@ -66,9 +79,9 @@ class ImageSynchronizer:
             return
 
         # Visualization (optional)
-        cv2.imshow("Color Image", color_image)
-        cv2.imshow("Depth Image", depth_image)
-        cv2.waitKey(3)
+        # cv2.imshow("Color Image", color_image)
+        # cv2.imshow("Depth Image", depth_image)
+        cv2.waitKey(1)
 
 
     def cleanup_image_path(self):
