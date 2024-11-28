@@ -9,9 +9,12 @@ from task_handler.msg import Object, Objects
 from geometry_msgs.msg import Point, Quaternion, Pose
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
-
+import rospy
+import tf
+import numpy as np
 import os
 from ultralytics import YOLO
+from sensor_msgs.msg import CameraInfo
 
 bridge = CvBridge()
 
@@ -26,6 +29,53 @@ def cleanup_image_path(img_path):
                 
         rospy.loginfo("Clear up the image folder:" + img_path)
 
+
+
+def pixel_to_world(u, v, depth, camera_info, camera_frame, world_frame):
+    """
+    Converts pixel coordinates to world coordinates.
+    
+    Args:
+        u, v: Pixel coordinates in the image.
+        depth: Depth value at the pixel (in meters).
+        camera_info: Camera intrinsic parameters (from CameraInfo message).
+        camera_frame: Frame ID of the camera.
+        world_frame: Frame ID of the world.
+        
+    Returns:
+        (x_world, y_world, z_world): World coordinates of the object.
+    """
+    # Extract intrinsic camera parameters
+    fx = camera_info.K[0]  # Focal length in x
+    fy = camera_info.K[4]  # Focal length in y
+    cx = camera_info.K[2]  # Optical center in x
+    cy = camera_info.K[5]  # Optical center in y
+    
+    # Step 1: Convert pixel to camera coordinates
+    X_camera = (u - cx) * depth / fx
+    Y_camera = (v - cy) * depth / fy
+    Z_camera = depth  # Depth from the depth camera
+    
+    # Point in the camera frame
+    point_camera = np.array([X_camera, Y_camera, Z_camera, 1])
+    
+    # Step 2: Transform camera coordinates to world coordinates
+    try:
+        tf_listener = tf.TransformListener()
+        tf_listener.waitForTransform(world_frame, camera_frame, rospy.Time(0), rospy.Duration(4.0))
+        (trans, rot) = tf_listener.lookupTransform(world_frame, camera_frame, rospy.Time(0))
+        
+        # Create transformation matrix
+        trans_mat = tf.transformations.translation_matrix(trans)
+        rot_mat = tf.transformations.quaternion_matrix(rot)
+        T_camera_to_world = np.dot(trans_mat, rot_mat)
+        
+        # Transform point to world coordinates
+        point_world = np.dot(T_camera_to_world, point_camera)
+        return point_world[:3]  # Return (x, y, z) in world coordinates
+    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+        rospy.logerr("TF lookup failed")
+        return None
 
 
 def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
@@ -55,11 +105,13 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
             for i, box in enumerate(boxes.xyxy.tolist()):
                 obj = Object()
                 x1, y1, x2, y2 = box
+                # Currently not save single identified objects to imporove performance. If you want to see each identified object, uncomment the following block
                 # Save the imags for reviewing: Crop the object using the bounding box coordinates
-                ultralytics_crop_object = rgb_image[int(y1):int(y2), int(x1):int(x2)]
-                file_name = os.path.join(output_dir, latest_file_short_name.rsplit(".", 1)[0] + "_" + str(i) + ".png")
-                cv2.imwrite(file_name, ultralytics_crop_object)
-                print(f"Save cropped image to {file_name}")
+                
+                # ultralytics_crop_object = rgb_image[int(y1):int(y2), int(x1):int(x2)]
+                # file_name = os.path.join(output_dir, latest_file_short_name.rsplit(".", 1)[0] + "_" + str(i) + ".png")
+                # cv2.imwrite(file_name, ultralytics_crop_object)
+                # print(f"Save cropped image to {file_name}")
                 
                 # capture the target object label, and x centroid, y centroid position
                 obj.name = object_labels[int(boxes.cls[i])]
@@ -71,10 +123,15 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
                     depth_image = cv2.rotate(depth_image, cv2.ROTATE_90_CLOCKWISE)
                     distance = depth_image[y_center, x_center]
 
-                # store in object
-                obj.pose = Pose(Point(x_center, y_center, distance), Quaternion(0.0, 0.0, 0.0, 0.0))
+                # convert the location in camera to world coordinate
+                world_coords = pixel_to_world(x_center, y_center, distance, camera_info, camera_frame, world_frame)
+                if world_coords is not None:
+                    rospy.loginfo("World coordinates: x=%f, y=%f, z=%f", *world_coords)
+
+                            # store in object
+                obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
                 obj_list.append(obj)
-            
+
             out_filename = os.path.join(output_dir, latest_file_short_name)
             results[0].save(out_filename)
             msg.objects = obj_list
@@ -113,6 +170,16 @@ if __name__ == '__main__':
         # rviz_camera = rospy.Publisher("/sensor_msgs/Image", Image, queue_size=100)
 
         rate = rospy.Rate(1)
+
+        try:
+            rospy.loginfo("waiting for the camera info...")
+            camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo, timeout=5.0)
+            rospy.loginfo("CameraInfo received.")
+            camera_frame = "camera_link"
+            world_frame = "base_link"
+
+        except rospy.ROSException as e:
+            rospy.logerr("Fail to retrieve camera info.")
 
         while not rospy.is_shutdown():
             msg = process_image(imageSaveDir, depthImageSaveDir, imageOutputDir)
