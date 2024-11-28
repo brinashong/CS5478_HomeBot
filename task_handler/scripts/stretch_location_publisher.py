@@ -96,7 +96,7 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
     if rgb_image is not None:
         # the original image comes out sideways. Rotate it to upright
         rgb_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
-        results = yolo_object_detector.predict(rgb_image, save=True, conf=0.3, imgsz = 640)
+        results = yolo_object_detector.predict(rgb_image, save=True, conf=0.6, imgsz = 640)
 
         boxes = results[0].boxes
         object_labels = results[0].names
