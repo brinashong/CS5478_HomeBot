@@ -114,32 +114,34 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
                 # print(f"Save cropped image to {file_name}")
                 
                 # capture the target object label, and x centroid, y centroid position
-                obj.name = object_labels[int(boxes.cls[i])]
+                class_id = int(boxes.cls[i])
+                obj.id = object_class_label[class_id][0]
+                obj.name = object_class_label[class_id][1]
                 x_center, y_center = int((x1 + x2) / 2), int((y1 + y2) / 2)
 
-                # capture the distance from x centroid, y_centroid to the camera
-                depth_image = cv2.imread(os.path.join(input_depthimage_dir, depth_image_short_name), flags= cv2.IMREAD_ANYDEPTH)
-                if depth_image is not None:
-                    depth_image = cv2.rotate(depth_image, cv2.ROTATE_90_CLOCKWISE)
-                    distance = depth_image[y_center, x_center]
+                if class_id in [2, 3, 4]: 
+                    # capture the distance from x centroid, y_centroid to the camera
+                    depth_image = cv2.imread(os.path.join(input_depthimage_dir, depth_image_short_name), flags= cv2.IMREAD_ANYDEPTH)
+                    if depth_image is not None:
+                        depth_image = cv2.rotate(depth_image, cv2.ROTATE_90_CLOCKWISE)
+                        distance = depth_image[y_center, x_center]
 
-                # convert the location in camera to world coordinate
-                world_coords = pixel_to_world(x_center, y_center, distance, camera_info, camera_frame, world_frame)
-                if world_coords is not None:
-                    rospy.loginfo("World coordinates: x=%f, y=%f, z=%f", *world_coords)
+                    # convert the location in camera to world coordinate
+                    world_coords = pixel_to_world(x_center, y_center, distance, camera_info, camera_frame, world_frame)
+                    if world_coords is not None:
+                        rospy.loginfo("World coordinates: x=%f, y=%f, z=%f", *world_coords)
 
-                            # store in object
-                obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
-                obj_list.append(obj)
+                    # store in object
+                    obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
+                    obj_list.append(obj)
 
             out_filename = os.path.join(output_dir, latest_file_short_name)
             results[0].save(out_filename)
             msg.objects = obj_list
     
-    
             tagged_image = cv2.imread(out_filename)
             cv2.imshow("Tagged Image",tagged_image)
-            cv2.waitKey(1)
+            cv2.waitKey(1000)
             # if you want to show the image in Rviz, uncomment the following line, and add ros_image to return value
             # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
 
@@ -161,6 +163,14 @@ if __name__ == '__main__':
 
     cleanup_image_path(imageOutputDir)
 
+    # the recognized objects. Value represents (id, name) in Object.msg
+    object_class_label = {0: ("table", "table"), 
+                   1: ("rubbish_bin","rubbish_bin"),
+                   2: ("book", "Book"),
+                   3: ("can", "Coke"),
+                   4: ("cup", "Mug"),
+                   5: ("book_shelf", "book_shelf")}
+
     try:
         rospy.init_node('stretch_hello_obj_loc_publisher', anonymous=True)
         rospy.loginfo("begin sending object detection info...")
@@ -176,7 +186,7 @@ if __name__ == '__main__':
             camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo, timeout=5.0)
             rospy.loginfo("CameraInfo received.")
             camera_frame = "camera_link"
-            world_frame = "base_link"
+            world_frame = "map"
 
         except rospy.ROSException as e:
             rospy.logerr("Fail to retrieve camera info.")

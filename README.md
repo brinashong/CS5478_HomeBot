@@ -5,30 +5,52 @@
 command line, type `pip install ultralytics`
 
 2. Run the following commands in different Terminals.
-```
-roslaunch stretch_navigation navigation_gazebo.launch
+    ```
+    roslaunch stretch_navigation navigation_gazebo_robotiq.launch
 
-roslaunch stretch_moveit_config demo_gazebo.launch
+    roslaunch task_handler tf.launch
 
-rosrun task_handler task_handler_node
+    roslaunch stretch_robotiq_moveit_config demo_gazebo.launch
 
-rosrun task_handler stretch_image_capture.py
+    rosrun task_handler task_handler_node
 
-rosrun task_handler stretch_location_publisher.py
-```
+    rosrun task_handler stretch_image_capture.py
+
+    rosrun task_handler stretch_location_publisher.py
+    ```
+
+    - If you just want to call /get_objects service when needed, replace the last two rosrun commands with:
+
+    ```
+    rosrun task_handler stretch_image_capture.py
+
+    Replace the above with: rosrun task_handler stretch_identify_object_server.py
+
+    rosrun task_handler stretch_location_publisher.py
+
+    Replace the above with: rosrun task_handler stretch_identify_object_client.py
+    ```
 
 # Useful Information</br>
-- node stretch_image_capture will generate two folders under task_handler folder. </br>
-    a. `images` folder - store RGB images </br>
-    b. `depth_images` folder - store depth info of the RGB images (with the same index in file name). <br>
-    c. `output_images` folder - store the tagged images by the Yolo11 model. <br>
+There are two methods to get object information through camera. <br>
 
-    Note: Feel free to delete those images. If node `stretch_image_capture` did not identify the existence of those folders, it will create them automatically.
+1. Subscription:
+    - node stretch_image_capture will generate two folders under task_handler folder. </br>
+        a. `images` folder - store RGB images </br>
+        b. `depth_images` folder - store depth info of the RGB images (with the same index in file name). <br>
+        c. `output_images` folder - store the tagged images by the Yolo11 model. <br>
 
-- node `stretch_location_publisher` will publish the target objects pose info to the topic `objects_poses`. </br>
-    - It will generate `output_images` folder. It stores tagged images with captured target objects after Yolo prediction. Each running, this folder will get cleaned up.
+        Note: Feel free to delete those images. If node `stretch_image_capture` did not identify the existence of those folders, it will create them automatically.
 
-- folder `perception_model` contains two Yolo models for perception. </br>
+    - node `stretch_location_publisher` will publish the target objects pose info to the topic `objects_poses`. </br>
+        - It will generate `output_images` folder. It stores tagged images with captured target objects after Yolo prediction. Each running, this folder will get cleaned up.
+    <br>
+
+2. Service:
+    - node `stretch_identify_object_server.py` will start the service at `/get_objects`.
+    - node `stretch_identify_object_client.py` contains sample code on how to request the service.<br>
+
+3. Folder `perception_model` contains two Yolo models for perception. </br>
     - Yolo8_retrained </br>
     This folder contains Yolo8 retrained model by using around 400 images from the Small House environment.
 
@@ -38,7 +60,8 @@ rosrun task_handler stretch_location_publisher.py
 # Publish object ground truth poses
 ```
 rostopic pub /object_poses task_handler/Objects "objects:
-- name: 'can'
+- id: 'can'
+- name: 'Coke'
   pose:
     position:
       x: 2.85
@@ -49,7 +72,8 @@ rostopic pub /object_poses task_handler/Objects "objects:
       y: 0.0
       z: 1.0
       w: 0.0" 
-- name: 'can'
+- id: 'cup'
+  name: 'Mug'
   pose:
     position:
       x: 2.08
@@ -60,18 +84,9 @@ rostopic pub /object_poses task_handler/Objects "objects:
       y: 0.0
       z: 0.0
       w: 0.0" 
-- name: 'cup'
-  pose:
-    position:
-      x: 2.07
-      y: -1.89
-      z: 0.37
-    orientation:
-      x: 0.0
-      y: 0.0
-      z: 0.0
-      w: 0.0" 
-- name: 'book'
+
+- id: "book"
+  name: 'Book'
   pose:
     position:
       x: 5.74
@@ -82,7 +97,8 @@ rostopic pub /object_poses task_handler/Objects "objects:
       y: 0.0
       z: 0.0
       w: 0.0" 
-- name: 'book'
+- id: "book"
+  name: 'Book2'
   pose:
     position:
       x: 5.70

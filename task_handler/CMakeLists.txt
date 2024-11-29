@@ -82,6 +82,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   geometry_msgs  # Or other packages containing msgs
+  
 )
 
 ################################################
@@ -199,6 +200,9 @@ target_link_libraries(tf_handler_node
 install(TARGETS ${PROJECT_NAME}_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+catkin_install_python(PROGRAMS scripts/stretch_identify_object_server.py scripts/stretch_identify_object_client.py 
+DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark libraries for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_libraries.html
