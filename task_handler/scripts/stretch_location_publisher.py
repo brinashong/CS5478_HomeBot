@@ -73,7 +73,7 @@ def pixel_to_world(u, v, depth, camera_info, camera_frame, world_frame):
         # Transform point to world coordinates
         point_world = np.dot(T_camera_to_world, point_camera)
         return point_world[:3]  # Return (x, y, z) in world coordinates
-    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+    except:
         rospy.logerr("TF lookup failed")
         return None
 
@@ -99,7 +99,6 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
         results = yolo_object_detector.predict(rgb_image, save=True, conf=0.6, imgsz = 640)
 
         boxes = results[0].boxes
-        object_labels = results[0].names
         if len(boxes) > 0:
             msg = Objects()
             for i, box in enumerate(boxes.xyxy.tolist()):
@@ -130,10 +129,9 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
                     world_coords = pixel_to_world(x_center, y_center, distance, camera_info, camera_frame, world_frame)
                     if world_coords is not None:
                         rospy.loginfo("World coordinates: x=%f, y=%f, z=%f", *world_coords)
-
-                    # store in object
-                    obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
-                    obj_list.append(obj)
+                        # store in object
+                        obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
+                        obj_list.append(obj)
 
             out_filename = os.path.join(output_dir, latest_file_short_name)
             results[0].save(out_filename)
@@ -141,13 +139,13 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
     
             tagged_image = cv2.imread(out_filename)
             cv2.imshow("Tagged Image",tagged_image)
-            cv2.waitKey(1000)
+            cv2.waitKey(1)
+    
             # if you want to show the image in Rviz, uncomment the following line, and add ros_image to return value
             # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
 
     # temporarily for debugging purpose
     print(msg)
-
     return msg
 
 
