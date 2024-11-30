@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 #include <ros/ros.h>
-#include <ros/service_server.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit/planning_interface/planning_interface.h>
@@ -29,6 +28,7 @@
 
 #include "task_handler/Object.h"
 #include "task_handler/Objects.h"
+#include "task_handler/GetObjects.h"
 #include "task_handler/GoalTask.h"
 #include "task_handler/moveit_client.hpp"
 
@@ -62,12 +62,12 @@ private:
 
   ros::NodeHandle nh_;
   ros::Subscriber result_sub_;
-  ros::Subscriber object_poses_sub_;
   ros::Publisher cmd_vel_pub_;
   ros::Publisher state_pub_;
   ros::Publisher task_pub_;
   ros::Publisher goal_pub_;
   ros::ServiceClient reset_srv_client_;
+  ros::ServiceClient get_objects_srv_client_;
   ros::ServiceServer goal_srv_server_;
 
   tf2_ros::Buffer tf2_buffer;
@@ -79,6 +79,7 @@ private:
   bool initialized_;
 
   State curr_state_;
+  std::string curr_zone_;
   std_msgs::String state_str_;
   std_msgs::String task_str_;
 

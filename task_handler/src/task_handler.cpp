@@ -3,6 +3,7 @@
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Twist.h"
 #include "moveit_msgs/CollisionObject.h"
+#include "ros/init.h"
 #include "tf2/LinearMath/Quaternion.h"
 
 TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
@@ -31,7 +32,6 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   );
 
   result_sub_ = nh_.subscribe<move_base_msgs::MoveBaseActionResult>("/move_base/result", 1, [this](const move_base_msgs::MoveBaseActionResult::ConstPtr& msg){ this->mbResultCallback(msg); });
-  object_poses_sub_ = nh_.subscribe<task_handler::Objects>("/object_poses", 1, [this](const task_handler::Objects::ConstPtr& msg){ this->objectPosesCallback(msg); });
 
   cmd_vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/stretch_diff_drive_vcontroller/cmd_vel", 1);
   state_pub_ = nh_.advertise<std_msgs::String>("/homebot/state", 1);
@@ -39,6 +39,7 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   goal_pub_ = nh_.advertise<visualization_msgs::Marker>("/homebot/goal", 1);
 
   reset_srv_client_ = nh_.serviceClient<std_srvs::SetBool>("/homebot/reset");
+  get_objects_srv_client_ = nh_.serviceClient<task_handler::GetObjects>("/object_poses");
   goal_srv_server_ = nh.advertiseService("/homebot/goal_task", &TaskHandler::uiButtonCallback, this);
 
   ac_ = std::make_unique<actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>>("move_base", true);
@@ -50,6 +51,7 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   initLookups();
 
   curr_state_ = State::IDLE;
+  curr_zone_ = "Coffee Table";
   state_str_.data = "Idle";
   state_pub_.publish(state_str_);
   task_str_.data = "Waiting for goal...";
@@ -87,6 +89,7 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
   // send mb goal
   if (req.active)
   {
+    curr_zone_ = req.zone;
     move_base_msgs::MoveBaseGoal goal;
     goal.target_pose = zone_goal_map_[req.zone];
     goal.target_pose.header.stamp = ros::Time::now();
@@ -128,7 +131,7 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
       auto pose = moveit_control_->getGazeboModelPose("Coke");
       if (pose.has_value())
       {
-        obj.id = "soda_can";
+        obj.id = "can";
         obj.name = "Coke";
         obj.pose = pose.value();
         obj.pose.position.z += 0.07;
@@ -194,28 +197,6 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
   return true;
 }
 
-void TaskHandler::objectPosesCallback(const task_handler::Objects::ConstPtr& msg)
-{
-  if (curr_state_ != State::READY_FOR_TASK)
-    return;
-
-  ROS_INFO_STREAM("Object poses received!");
-
-  std::queue<task_handler::Object> empty;
-  std::swap( objects_, empty );
-
-  for (const auto& obj : msg->objects)
-  {
-    ROS_INFO_STREAM("Adding " << obj.name << " to list");
-    objects_.push(obj);
-  }
-
-  curr_state_ = State::GO_TO_OBJECT;
-  state_str_.data = "Go to object";
-  state_pub_.publish(state_str_);
-  sendObjectGoal();
-}
-
 void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msg)
 {
   ROS_INFO_STREAM("Move Base result received");
@@ -226,16 +207,34 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
     switch (curr_state_)
     {
       case State::GO_TO_GOAL:
-        curr_state_ = State::READY_FOR_TASK;
-        state_str_.data = "Ready for task";
-        state_pub_.publish(state_str_);
-        task_str_.data = "Detecting objects...";
-        task_pub_.publish(task_str_);
+        {
+          curr_state_ = State::READY_FOR_TASK;
+          state_str_.data = "Ready for task";
+          state_pub_.publish(state_str_);
+          task_str_.data = "Detecting objects...";
+          task_pub_.publish(task_str_);
 
-        curr_state_ = State::GO_TO_OBJECT;
-        state_str_.data = "Go to object";
-        state_pub_.publish(state_str_);
-        sendObjectGoal();
+          // request for detected objects from perception
+          task_handler::GetObjects srv;
+          if (get_objects_srv_client_.call(srv))
+          {
+            std::queue<task_handler::Object> empty;
+            std::swap( objects_, empty );
+            auto goal_pose = zone_goal_map_[curr_zone_];
+            for (auto& obj : srv.response.objects.objects)
+            {
+              // obj.pose.position.z += 0.07; // varies for objects
+              objects_.push(obj);
+              auto res = getApproachPose(goal_pose, obj.pose);
+              objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
+            }
+          }
+
+          curr_state_ = State::GO_TO_OBJECT;
+          state_str_.data = "Go to object";
+          state_pub_.publish(state_str_);
+          sendObjectGoal();
+        }
         break;
       case State::GO_TO_OBJECT:
         curr_state_ = State::PICK_OBJECT;

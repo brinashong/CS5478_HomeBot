@@ -186,7 +186,11 @@ if __name__ == '__main__':
             camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo, timeout=5.0)
             rospy.loginfo("CameraInfo received.")
             camera_frame = "camera_link"
+<<<<<<< Updated upstream
             world_frame = "map"
+=======
+            world_frame = "base_link" # "map"
+>>>>>>> Stashed changes
 
         except rospy.ROSException as e:
             rospy.logerr("Fail to retrieve camera info.")
