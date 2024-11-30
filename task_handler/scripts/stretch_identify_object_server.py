@@ -4,6 +4,7 @@ import rospy
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import os
+from pathlib import Path
 import numpy as np
 from task_handler.srv import GetObjects, GetObjectsResponse
 import message_filters
@@ -24,6 +25,7 @@ class GetObjectsServer:
         self.yolo_object_detector = yolo_model
         self.camera_info = camera_info
         self.object_label = object_label
+        self.output_img_index = 0
 
         # Subscribers for color and depth images
         self.color_sub = message_filters.Subscriber("camera/color/image_raw", Image)
@@ -88,7 +90,7 @@ class GetObjectsServer:
             # Transform point to world coordinates
             point_world = np.dot(T_camera_to_world, point_camera)
             return point_world[:3]  # Return (x, y, z) in world coordinates
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+        except:
             rospy.logerr("TF lookup failed")
             return None
 
@@ -98,19 +100,18 @@ class GetObjectsServer:
             rospy.logwarn("No data received from /camera/color/image_raw yet!")
             return GetObjectsResponse(None)
 
-        obj_list = []
+        
         # the original image comes out sideways. Rotate it to upright
         rgb_image = cv2.rotate(self.latest_color_image, cv2.ROTATE_90_CLOCKWISE)
-        results = self.yolo_object_detector.predict(rgb_image, save=False, conf=0.5, imgsz = 640)
+        results = self.yolo_object_detector.predict(rgb_image, save=True, conf=0.65, imgsz = 640)
 
         boxes = results[0].boxes
-        
+        obj_list = []
         msg = Objects()
 
         if len(boxes) > 0:
             for i, box in enumerate(boxes.xyxy.tolist()):
                 obj = Object()
-
 
                 x1, y1, x2, y2 = [int(item) for item in box]
 
@@ -130,31 +131,45 @@ class GetObjectsServer:
                     # convert the location in camera to world coordinate
                     world_coords = self.pixel_to_world(x_center, y_center, depth, self.camera_info, camera_frame, world_frame)
                     if world_coords is not None:
-                        rospy.loginfo(obj.name + " - World coordinates: x=%f, y=%f, z=%f", world_coords.x, world_coords.y, world_coords.z)
-
-                    # store in object
-                    obj.pose = Pose(world_coords, Quaternion(0.0, 0.0, 0.0, 0.0))
-                    obj_list.append(obj)
+                        rospy.loginfo("World coordinates: x=%f, y=%f, z=%f", *world_coords)
+                        # store in object
+                        obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
+                        obj_list.append(obj)
     
-            # show the tagged image
-            out_filename = os.path.join(imageOutputDir, "tagged_image.jpeg")
-            results[0].save(out_filename)
-            tagged_image = cv2.imread(out_filename)
-            cv2.imshow("Tagged Image", tagged_image)
-            cv2.waitKey(1000)
+        # show the tagged image
+        out_filename = os.path.join(imageOutputDir, "tagged_image_" + str(self.output_img_index) + ".png")
+        results[0].save(out_filename)
+        self.output_img_index += 1
+        tagged_image = cv2.imread(out_filename)
+        cv2.imshow("Tagged Image", tagged_image)
+        cv2.waitKey(1)
+        
+   
             # if you want to show the image in Rviz, uncomment the following line, and add ros_image to return value
             # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
 
         # temporarily for debugging purpose
         print(msg)
-        msg.objects = obj_list
         rospy.loginfo("Finish processing, and response to client.")
+
+        msg.objects = obj_list
         return GetObjectsResponse(msg)
 
+# clean up the output directory before each running
+def cleanup_image_path(img_path):
+    if not os.path.exists(img_path):
+        os.makedirs(img_path)
+    else:
+        for path in Path(img_path).glob("**/*"):
+            if path.is_file():
+                path.unlink()
+                
+        rospy.loginfo("Clear up the image folder:" + img_path)
 
 if __name__ == "__main__":
     rospy.init_node("stretch_identify_object_server")
     imageOutputDir = os.path.dirname(os.path.abspath(__file__)) + "/output_images"
+    cleanup_image_path(imageOutputDir)
 
     # get Yolo model
     models_directory = os.path.dirname(os.path.abspath(__file__)) + "/perception_model/Yolo11_retrained/"
@@ -173,12 +188,12 @@ if __name__ == "__main__":
         rospy.logerr("Fail to retrieve camera info.")
 
     gt_objects_info = []
-    gt_object = Object()
     try: 
         for object_id, object_name in [("can", "Coke"), ("cup", 'Mug'), ("book", 'Book')]:
             rospy.loginfo("Getting the positions of objects in Gazebo.")
             get_model_state = rospy.ServiceProxy("/gazebo/get_model_state", GetModelState)
             response = get_model_state(model_name = object_name, relative_entity_name="world")
+            gt_object = Object()
             gt_object.id = object_id 
             gt_object.name = object_name
             gt_object.pose = response.pose
