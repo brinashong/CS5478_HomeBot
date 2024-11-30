@@ -79,7 +79,7 @@ class GetObjectsServer:
         # Step 2: Transform camera coordinates to world coordinates
         try:
             tf_listener = tf.TransformListener()
-            tf_listener.waitForTransform(world_frame, camera_frame, rospy.Time(0), rospy.Duration(4.0))
+            tf_listener.waitForTransform(world_frame, camera_frame, rospy.Time(0), rospy.Duration(1.0))
             (trans, rot) = tf_listener.lookupTransform(world_frame, camera_frame, rospy.Time(0))
             
             # Create transformation matrix
@@ -98,13 +98,13 @@ class GetObjectsServer:
     def handle_request(self, req):
         if self.latest_color_image is None:
             rospy.logwarn("No data received from /camera/color/image_raw yet!")
-            return GetObjectsResponse(None)
+            return None
 
         
         # the original image comes out sideways. Rotate it to upright
         rgb_image = cv2.rotate(self.latest_color_image, cv2.ROTATE_90_CLOCKWISE)
         results = self.yolo_object_detector.predict(rgb_image, save=True, conf=0.65, imgsz = 640)
-
+  
         boxes = results[0].boxes
         obj_list = []
         msg = Objects()
@@ -112,21 +112,23 @@ class GetObjectsServer:
         if len(boxes) > 0:
             for i, box in enumerate(boxes.xyxy.tolist()):
                 obj = Object()
-
                 x1, y1, x2, y2 = [int(item) for item in box]
 
                 # capture the target object label, and x centroid, y centroid position
                 class_id = int(boxes.cls[i])
-                
                 obj.name = self.object_label[class_id][1]
                 obj.id = self.object_label[class_id][0]
-              
+                # conf = boxes[i].conf
+                # rgb_image = cv2.rectangle(rgb_image, (x1, y1-25), (x2, y2), (0, 255, 0), 3)
+                # rgb_image = cv2.putText(rgb_image, obj.name + str(float(conf)), (x1, y1 - 10), cv2.FONT_HERSHEY_PLAIN, 0.7, (0,0,0), 3)
+
                 x_center, y_center = int((x1 + x2) / 2), int((y1 + y2) / 2)
 
                 # if the class_id indicates Cup, Can or Book, store them in object_list
                 if class_id in [2, 3, 4]: 
                     depth_image = cv2.rotate(self.latest_depth_image, cv2.ROTATE_90_CLOCKWISE)
                     depth = depth_image[y_center, x_center]
+                    print("debugging...")
 
                     # convert the location in camera to world coordinate
                     world_coords = self.pixel_to_world(x_center, y_center, depth, self.camera_info, camera_frame, world_frame)
@@ -135,16 +137,13 @@ class GetObjectsServer:
                         # store in object
                         obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
                         obj_list.append(obj)
-    
+
+            rospy.loginfo("finish looping the boxes")
         # show the tagged image
-        out_filename = os.path.join(imageOutputDir, "tagged_image_" + str(self.output_img_index) + ".png")
+        out_filename = os.path.join(imageOutputDir, "tagged_image_" + str(self.output_img_index) + ".jpg")
+        self.output_img_index +=1
         results[0].save(out_filename)
-        self.output_img_index += 1
-        tagged_image = cv2.imread(out_filename)
-        cv2.imshow("Tagged Image", tagged_image)
-        cv2.waitKey(1)
-        
-   
+
             # if you want to show the image in Rviz, uncomment the following line, and add ros_image to return value
             # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
 
@@ -153,7 +152,7 @@ class GetObjectsServer:
         rospy.loginfo("Finish processing, and response to client.")
 
         msg.objects = obj_list
-        return GetObjectsResponse(msg)
+        return msg, out_filename
 
 # clean up the output directory before each running
 def cleanup_image_path(img_path):

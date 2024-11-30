@@ -136,7 +136,7 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
             out_filename = os.path.join(output_dir, latest_file_short_name)
             results[0].save(out_filename)
             msg.objects = obj_list
-    
+            
             tagged_image = cv2.imread(out_filename)
             cv2.imshow("Tagged Image",tagged_image)
             cv2.waitKey(1)
@@ -177,7 +177,7 @@ if __name__ == '__main__':
         # if you want to show image in rviz, uncomment the following line to publish to the topic /sensor_msgs/Image
         # rviz_camera = rospy.Publisher("/sensor_msgs/Image", Image, queue_size=100)
 
-        rate = rospy.Rate(1)
+        rate = rospy.Rate(2)
 
         try:
             rospy.loginfo("waiting for the camera info...")
