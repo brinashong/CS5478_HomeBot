@@ -12,8 +12,7 @@ if __name__ == "__main__":
         rospy.loginfo("waiting to receive data:")
         process_data = rospy.ServiceProxy("/get_objects", GetObjects)
         response = process_data()
-        rospy.loginfo(f"Received data. {response.objects}, {response.output_file}")
-
+        rospy.loginfo(f"Received data. {response.objects}, {response.real_objects}, {response.output_file}")
         img = io.imread(response.output_file)
         io.imshow(img)
         io.show()
