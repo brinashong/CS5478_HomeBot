@@ -82,7 +82,7 @@ class ImageSynchronizer:
                 rospy.loginfo("Clear up the image folder:" + img_path)
 
 def main():
-    rospy.init_node('stretch_hello_image_capture', anonymous=True)
+    rospy.init_node('stretch_image_capture', anonymous=True)
     rospy.loginfo("begin capturing hello robot image...")
 
     try:

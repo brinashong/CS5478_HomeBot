@@ -9,13 +9,12 @@ import numpy as np
 from task_handler.srv import GetObjects, GetObjectsResponse
 import message_filters
 from task_handler.msg import Object, Objects
-from geometry_msgs.msg import Point, Quaternion, Pose, PointStamped
+from geometry_msgs.msg import Point, Quaternion, Pose
 import tf
 from ultralytics import YOLO
 from sensor_msgs.msg import CameraInfo, Image
 from gazebo_msgs.srv import GetModelState
-
-
+import sys
 
 class GetObjectsServer:
     def __init__(self, yolo_model, camera_info, object_label, camera_frame, world_frame, gt_objects_info):
@@ -48,7 +47,6 @@ class GetObjectsServer:
         self.depth_msg = depth_msg
 
     def get_original_coordinates(self, x_rotated, y_rotated, original_image_height):
-        # Calculate the original coordinates
         x_original = y_rotated
         y_original = original_image_height - x_rotated - 1
         return x_original, y_original
@@ -85,8 +83,8 @@ class GetObjectsServer:
         # Step 2: Transform camera coordinates to world coordinates
         try:
             tf_listener = tf.TransformListener()
-            tf_listener.waitForTransform(self.world_frame, self.camera_frame, rospy.Time(0), rospy.Duration(4.0))
-            (trans, rot) = tf_listener.lookupTransform(self.world_frame, self.camera_frame, rospy.Time(0))
+            tf_listener.waitForTransform(world_frame, camera_frame, rospy.Time(0), rospy.Duration(4.0))
+            (trans, rot) = tf_listener.lookupTransform(world_frame, camera_frame, rospy.Time(0))
             
             # Create transformation matrix
             trans_mat = tf.transformations.translation_matrix(trans)
@@ -113,17 +111,14 @@ class GetObjectsServer:
             depth_image = self.cv_bridge.imgmsg_to_cv2(self.depth_msg, "32FC1")  # Assuming depth is in meters
         except:
             rospy.logerr("fail to convert image format to cv2 and cache them.")
+            return None
         
         ori_height = rgb_image.shape[0]
-        print(rgb_image.shape[0], rgb_image.shape[1])
-        print("initial depth image shape: ", depth_image.shape)
         rgb_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
-        print("after rotate:", rgb_image.shape[0], rgb_image.shape[1])
         depth_image = cv2.rotate(depth_image, cv2.ROTATE_90_CLOCKWISE)
-        print("rotated depth image shape: h x w: ", depth_image.shape[0], depth_image.shape[1])
         results = self.yolo_object_detector.predict(rgb_image, save=True, conf=0.65)
   
-        # show the tagged image
+        # save the tagged image
         out_filename = os.path.join(imageOutputDir, "tagged_image_" + str(self.output_img_index) + ".jpg")
         self.output_img_index += 1
         results[0].save(out_filename)
@@ -136,37 +131,27 @@ class GetObjectsServer:
             for i, box in enumerate(boxes.xyxy.tolist()):
                 obj = Object()
                 x1, y1, x2, y2 = [int(item) for item in box]
-                print(x1, y1, x2, y2)
 
                 # capture the target object label, and x centroid, y centroid position
                 class_id = int(boxes.cls[i])
                 obj.name = self.object_label[class_id][1]
                 obj.id = self.object_label[class_id][0]
-                # conf = boxes[i].conf
-                # rgb_image = cv2.rectangle(rgb_image, (x1, y1-25), (x2, y2), (0, 255, 0), 3)
-                # rgb_image = cv2.putText(rgb_image, obj.name + str(float(conf)), (x1, y1 - 10), cv2.FONT_HERSHEY_PLAIN, 0.7, (0,0,0), 3)
 
                 # if the class_id indicates Cup, Can or Book, store them in object_list
                 if class_id in [2, 3, 4]: 
-                    x_center, y_center = int((x1 + x2) / 2), int((y1 + y2) / 2)
-                    print(x_center, y_center)
-                    
+                    x_center, y_center = int((x1 + x2) / 2), int((y1 + y2) / 2)   
                     depth = depth_image[y_center, x_center] / 1000
-                    print("debugging...depth:", depth)
 
                     # we need to find the point's coordinates in original un-rotated image to transform coordinates
                     ori_x_center, ori_y_center = self.get_original_coordinates(x_center, y_center, ori_height)
 
                     # convert the location in camera to world coordinate
-                    world_coords = self.pixel_to_world(ori_x_center, ori_y_center, depth, self.camera_info, camera_frame, world_frame)
+                    world_coords = self.pixel_to_world(ori_x_center, ori_y_center, depth, self.camera_info, self.camera_frame, self.world_frame)
                     if world_coords is not None:
-                        rospy.loginfo("World coordinates: x=%f, y=%f, z=%f", *world_coords)
-                        # store in object
                         obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
                         obj_list.append(obj)
 
             rospy.loginfo("finish looping the boxes")
-
 
             # if you want to show the image in Rviz, uncomment the following line, and add ros_image to return value
             # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
@@ -186,7 +171,6 @@ def cleanup_image_path(img_path):
         for path in Path(img_path).glob("**/*"):
             if path.is_file():
                 path.unlink()
-                
         rospy.loginfo("Clear up the image folder:" + img_path)
 
 if __name__ == "__main__":
@@ -209,6 +193,8 @@ if __name__ == "__main__":
         world_frame = "map"
     except rospy.ROSException as e:
         rospy.logerr("Fail to retrieve camera info.")
+        sys.exit(-1)
+
 
     gt_objects = Objects()
     gt_objects_info = []
@@ -233,7 +219,7 @@ if __name__ == "__main__":
     rospy.loginfo(gt_objects_info)
     print("")
 
-    # the recognized objects. Value represents (id, name) in Object.msg
+    # the recognized objects. Need this info to fill GetObjects.srv
     object_class_label = {0: ("table", "table"), 
                    1: ("rubbish_bin","rubbish_bin"),
                    2: ("book", "Book"),
@@ -243,5 +229,5 @@ if __name__ == "__main__":
 
     server = GetObjectsServer(yolo_object_detector, camera_info, object_class_label, camera_frame, world_frame, gt_objects)
     rospy.spin()
-
+    
 	
