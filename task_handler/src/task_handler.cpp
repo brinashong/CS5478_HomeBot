@@ -1,6 +1,4 @@
 #include "task_handler/task_handler.hpp"
-#include "angles/angles.h"
-#include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Twist.h"
 #include "moveit_msgs/CollisionObject.h"
 #include "tf2/LinearMath/Quaternion.h"
@@ -39,6 +37,7 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   goal_pub_ = nh_.advertise<visualization_msgs::Marker>("/homebot/goal", 1);
 
   reset_srv_client_ = nh_.serviceClient<std_srvs::SetBool>("/homebot/reset");
+  get_objects_srv_client_ = nh_.serviceClient<task_handler::GetObjects>("/object_poses");
   goal_srv_server_ = nh.advertiseService("/homebot/goal_task", &TaskHandler::uiButtonCallback, this);
 
   ac_ = std::make_unique<actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>>("move_base", true);
@@ -50,6 +49,7 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   initLookups();
 
   curr_state_ = State::IDLE;
+  curr_zone_ = "Coffee Table";
   state_str_.data = "Idle";
   state_pub_.publish(state_str_);
   task_str_.data = "Waiting for goal...";
@@ -87,6 +87,7 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
   // send mb goal
   if (req.active)
   {
+    curr_zone_ = req.zone;
     move_base_msgs::MoveBaseGoal goal;
     goal.target_pose = zone_goal_map_[req.zone];
     goal.target_pose.header.stamp = ros::Time::now();
@@ -128,14 +129,12 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
       auto pose = moveit_control_->getGazeboModelPose("Coke");
       if (pose.has_value())
       {
-        obj.id = "soda_can";
+        obj.id = "can";
         obj.name = "Coke";
         obj.pose = pose.value();
         obj.pose.position.z += 0.07;
         objects_.push(obj);
-        std::cout << "obj pose: " << obj.pose << std::endl;
         auto res = getApproachPose(goal_pose, obj.pose);
-        std::cout << "app pose: " << res << std::endl;
         objects_approach_goals_.push(res);
       }
 
@@ -154,18 +153,7 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
     {
       auto goal_pose = zone_goal_map_[req.zone];
 
-      auto pose = moveit_control_->getGazeboModelPose("Book2");
-      if (pose.has_value())
-      {
-        obj.id = "book";
-        obj.name = "Book2";
-        obj.pose = pose.value();
-        obj.pose.position.z += 0.13;
-        objects_.push(obj);
-        objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
-      }
-
-      pose = moveit_control_->getGazeboModelPose("Book");
+      auto pose = moveit_control_->getGazeboModelPose("Book");
       if (pose.has_value())
       {
         obj.id = "book";
@@ -226,16 +214,34 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
     switch (curr_state_)
     {
       case State::GO_TO_GOAL:
-        curr_state_ = State::READY_FOR_TASK;
-        state_str_.data = "Ready for task";
-        state_pub_.publish(state_str_);
-        task_str_.data = "Detecting objects...";
-        task_pub_.publish(task_str_);
+        {
+          curr_state_ = State::READY_FOR_TASK;
+          state_str_.data = "Ready for task";
+          state_pub_.publish(state_str_);
+          task_str_.data = "Detecting objects...";
+          task_pub_.publish(task_str_);
 
-        curr_state_ = State::GO_TO_OBJECT;
-        state_str_.data = "Go to object";
-        state_pub_.publish(state_str_);
-        sendObjectGoal();
+          // request for detected objects from perception
+          task_handler::GetObjects srv;
+          if (get_objects_srv_client_.call(srv))
+          {
+            std::queue<task_handler::Object> empty;
+            std::swap( objects_, empty );
+            auto goal_pose = zone_goal_map_[curr_zone_];
+            for (auto& obj : srv.response.objects.objects)
+            {
+              // obj.pose.position.z += 0.07; // varies for objects
+              objects_.push(obj);
+              auto res = getApproachPose(goal_pose, obj.pose);
+              objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
+            }
+          }
+
+          curr_state_ = State::GO_TO_OBJECT;
+          state_str_.data = "Go to object";
+          state_pub_.publish(state_str_);
+          sendObjectGoal();
+        }
         break;
       case State::GO_TO_OBJECT:
         curr_state_ = State::PICK_OBJECT;
@@ -268,7 +274,6 @@ void TaskHandler::initLookups()
    * Object List
    ===========
    - Book
-   - Book2
    - Coke
    - Mug 
    */
@@ -293,15 +298,15 @@ void TaskHandler::initLookups()
   robot_target_map_["sink"] = pose;
 
   // book shelf position 1
-  pose.pose.position.x = 4.407;
-  pose.pose.position.y = -5.182;
-  pose.pose.position.z = 0.85;
-  pose.pose.orientation.w = 1.0;
-  object_location_map_["Book2"] = "book shelf";
-  object_target_map_["Book2"] = pose;
-  pose.pose.position.y = -4.64;
-  pose.pose.position.z = 0.0;
-  robot_target_map_["book shelf"] = pose;
+  // pose.pose.position.x = 4.407;
+  // pose.pose.position.y = -5.182;
+  // pose.pose.position.z = 0.85;
+  // pose.pose.orientation.w = 1.0;
+  // object_location_map_["Book2"] = "book shelf";
+  // object_target_map_["Book2"] = pose;
+  // pose.pose.position.y = -4.64;
+  // pose.pose.position.z = 0.0;
+  // robot_target_map_["book shelf"] = pose;
 
   // book shelf position 2
   pose.pose.position.x = 4.142;
