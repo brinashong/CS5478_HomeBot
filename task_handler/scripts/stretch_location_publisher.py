@@ -149,7 +149,7 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
             # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
 
     # temporarily for debugging purpose
-    print(msg)
+    print("when handling file:", latest_file_short_name, ":", msg)
     return msg
 
 
