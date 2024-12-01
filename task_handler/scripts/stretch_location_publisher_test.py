@@ -16,7 +16,6 @@ import os
 from ultralytics import YOLO
 from sensor_msgs.msg import CameraInfo
 from gazebo_msgs.srv import GetModelState
-import sys
 
 bridge = CvBridge()
 
@@ -79,17 +78,12 @@ def pixel_to_world(u, v, depth, camera_info, camera_frame, world_frame):
         rospy.logerr("TF lookup failed")
         return None
 
-# transform the rotated x, y coordinates to the original ones
-def get_original_coordinates(x_rotated, y_rotated, original_image_height):
-    x_original = y_rotated
-    y_original = original_image_height - x_rotated - 1
-    return x_original, y_original
-    
+
 def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
     msg = None
     obj_list = []
 
-    # stretch_image_capture.py store many images in the folder. When anayzing
+    # stretch_image_capture.py usually stores 20 latest images in the folder. When anayzing
     # images and looking for the target objects, choose only the latest image
     filenames = [os.path.join(input_rgbimage_dir, fname) for fname in os.listdir(input_rgbimage_dir)]
     latest_file = max(filenames, key=os.path.getmtime)
@@ -101,13 +95,9 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
     rgb_image = cv2.imread(latest_file)
 
     if rgb_image is not None:
-        ori_height = rgb_image.shape[0]
-
         # the original image comes out sideways. Rotate it to upright
         rgb_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
-        depth_image = cv2.imread(os.path.join(input_depthimage_dir, depth_image_short_name), flags= cv2.IMREAD_ANYDEPTH)
-        depth_image = cv2.rotate(depth_image, cv2.ROTATE_90_CLOCKWISE)
-        results = yolo_object_detector.predict(rgb_image, save=True, conf=0.65)
+        results = yolo_object_detector.predict(rgb_image, save=True, conf=0.6, imgsz = 640)
 
         boxes = results[0].boxes
         if len(boxes) > 0:
@@ -115,7 +105,14 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
             for i, box in enumerate(boxes.xyxy.tolist()):
                 obj = Object()
                 x1, y1, x2, y2 = box
-         
+                # Currently not save single identified objects to imporove performance. If you want to see each identified object, uncomment the following block
+                # Save the imags for reviewing: Crop the object using the bounding box coordinates
+                
+                # ultralytics_crop_object = rgb_image[int(y1):int(y2), int(x1):int(x2)]
+                # file_name = os.path.join(output_dir, latest_file_short_name.rsplit(".", 1)[0] + "_" + str(i) + ".png")
+                # cv2.imwrite(file_name, ultralytics_crop_object)
+                # print(f"Save cropped image to {file_name}")
+                
                 # capture the target object label, and x centroid, y centroid position
                 class_id = int(boxes.cls[i])
                 obj.id = object_class_label[class_id][0]
@@ -123,24 +120,24 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
                 x_center, y_center = int((x1 + x2) / 2), int((y1 + y2) / 2)
 
                 if class_id in [2, 3, 4]: 
-                    # opencv image shape is: height, width, channel. 
-                    depth = depth_image[y_center, x_center] / 1000
-
-                    # we need to find the point's coordinates in original un-rotated image to transform coordinates
-                    ori_x_center, ori_y_center = get_original_coordinates(x_center, y_center, ori_height)
+                    # capture the distance from x centroid, y_centroid to the camera
+                    depth_image = cv2.imread(os.path.join(input_depthimage_dir, depth_image_short_name), flags= cv2.IMREAD_ANYDEPTH)
+                    if depth_image is not None:
+                        depth_image = cv2.rotate(depth_image, cv2.ROTATE_90_CLOCKWISE)
+                        distance = depth_image[y_center, x_center]
 
                     # convert the location in camera to world coordinate
-                    world_coords = pixel_to_world(ori_x_center, ori_y_center, depth, camera_info, camera_frame, world_frame)
+                    world_coords = pixel_to_world(x_center, y_center, distance, camera_info, camera_frame, world_frame)
                     if world_coords is not None:
                         rospy.loginfo("World coordinates: x=%f, y=%f, z=%f", *world_coords)
+                        # store in object
                         obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
                         obj_list.append(obj)
 
-            # store in output_images folder
             out_filename = os.path.join(output_dir, latest_file_short_name)
             results[0].save(out_filename)
             msg.objects = obj_list
-            
+    
             tagged_image = cv2.imread(out_filename)
             cv2.imshow("Tagged Image",tagged_image)
             cv2.waitKey(1)
@@ -155,7 +152,6 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
 
 if __name__ == '__main__':
 
-    # initialize folders and load model
     models_directory = os.path.dirname(os.path.abspath(__file__)) + "/perception_model/Yolo11_retrained/"
     yolo_object_detector = YOLO(models_directory + "best.pt")
     rospy.loginfo('The directory for deep learning models:', models_directory)  
@@ -163,62 +159,69 @@ if __name__ == '__main__':
     imageSaveDir = os.path.dirname(os.path.abspath(__file__)) + "/images"
     depthImageSaveDir = os.path.dirname(os.path.abspath(__file__)) + "/depth_images"
     imageOutputDir = os.path.dirname(os.path.abspath(__file__)) + "/output_images"
+
     cleanup_image_path(imageOutputDir)
 
-    # just print out ground truth values of objects, as reference
-    gt_objects = Objects()
-    gt_objects_info = []
-    try: 
-        for object_id, object_name in [("can", "Coke"), ("cup", 'Mug'), ("book", 'Book')]:
-            rospy.loginfo("Getting the positions of objects in Gazebo.")
-            get_model_state = rospy.ServiceProxy("/gazebo/get_model_state", GetModelState)
-            response = get_model_state(model_name = object_name, relative_entity_name="world")
-            gt_object = Object()
-            gt_object.id = object_id 
-            gt_object.name = object_name
-            gt_object.pose = response.pose
-            gt_objects_info.append(gt_object)
-        gt_objects.objects = gt_objects_info
-
-        if response.success:
-            rospy.loginfo("Model_states received.")
-    except rospy.ROSException as e:
-        rospy.logerr("Fail to retrieve model states.")
-
-    print("object ground truth:")
-    rospy.loginfo(gt_objects_info)
-    print("")
-
-    # the recognized objects. Info is used to build objects.msg
+    # the recognized objects. Value represents (id, name) in Object.msg
     object_class_label = {0: ("table", "table"), 
                    1: ("rubbish_bin","rubbish_bin"),
                    2: ("book", "Book"),
                    3: ("can", "Coke"),
                    4: ("cup", "Mug"),
                    5: ("book_shelf", "book_shelf")}
+    # object_class_label = {
+    #                        0: ("book", "Book"),
+    #                        1: ("can", "Coke"),
+    #                        2: ("cup", "Mug")
+    #                      }
 
     try:
-        rospy.init_node('stretch_object_location_publisher', anonymous=True)
+        rospy.init_node('stretch_hello_obj_loc_publisher', anonymous=True)
         rospy.loginfo("begin sending object detection info...")
         obj_pub = rospy.Publisher('/objects_poses', Objects, queue_size=100)
 
         # if you want to show image in rviz, uncomment the following line to publish to the topic /sensor_msgs/Image
         # rviz_camera = rospy.Publisher("/sensor_msgs/Image", Image, queue_size=100)
 
-        rate = rospy.Rate(5)
+        rate = rospy.Rate(1)
 
-        # get camera info
         try:
             rospy.loginfo("waiting for the camera info...")
             camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo, timeout=5.0)
             rospy.loginfo("CameraInfo received.")
             camera_frame = "camera_link"
             world_frame = "map"
+
         except rospy.ROSException as e:
             rospy.logerr("Fail to retrieve camera info.")
-            sys.exit(-1)
-        
-        # publish loop
+
+        gt_objects_info = []
+        try: 
+            for object_id, object_name in [("can", "Coke"), ("cup", 'Mug'), ("book", 'Book')]:
+                rospy.loginfo("Getting the positions of objects in Gazebo.")
+                get_model_state = rospy.ServiceProxy("/gazebo/get_model_state", GetModelState)
+                response = get_model_state(model_name = object_name, relative_entity_name="world")
+                gt_object = Object()
+                gt_object.id = object_id 
+                gt_object.name = object_name
+                gt_object.pose = response.pose
+                if object_name == "Coke":
+                    gt_object.pose.position.z += 0.07
+                elif object_name == "Mug":
+                    gt_object.pose.position.z += 0.08
+                elif object_name == "Book":
+                    gt_object.pose.position.z += 0.13
+                gt_objects_info.append(gt_object)
+
+            if response.success:
+                rospy.loginfo("Model_states received.")
+        except rospy.ROSException as e:
+            rospy.logerr("Fail to retrieve model states.")
+
+        print("object ground truth:")
+        rospy.loginfo(gt_objects_info)
+        print("")
+
         while not rospy.is_shutdown():
             msg = process_image(imageSaveDir, depthImageSaveDir, imageOutputDir)
 

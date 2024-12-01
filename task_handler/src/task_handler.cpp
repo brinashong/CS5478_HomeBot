@@ -1,7 +1,6 @@
 #include "task_handler/task_handler.hpp"
 #include "geometry_msgs/Twist.h"
 #include "moveit_msgs/CollisionObject.h"
-#include "ros/init.h"
 #include "tf2/LinearMath/Quaternion.h"
 
 TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
@@ -30,7 +29,7 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   );
 
   result_sub_ = nh_.subscribe<move_base_msgs::MoveBaseActionResult>("/move_base/result", 1, [this](const move_base_msgs::MoveBaseActionResult::ConstPtr& msg){ this->mbResultCallback(msg); });
-  objects_sub_ = nh_.subscribe<task_handler::Objects>("/objects_poses", 1, [this](const task_handler::Objects::ConstPtr& msg){ this->objectsCallback(msg); });
+  object_poses_sub_ = nh_.subscribe<task_handler::Objects>("/object_poses", 1, [this](const task_handler::Objects::ConstPtr& msg){ this->objectPosesCallback(msg); });
 
   cmd_vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/stretch_diff_drive_vcontroller/cmd_vel", 1);
   state_pub_ = nh_.advertise<std_msgs::String>("/homebot/state", 1);
@@ -154,17 +153,6 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
     {
       auto goal_pose = zone_goal_map_[req.zone];
 
-      // auto pose = moveit_control_->getGazeboModelPose("Book2");
-      // if (pose.has_value())
-      // {
-      //   obj.id = "book";
-      //   obj.name = "Book2";
-      //   obj.pose = pose.value();
-      //   obj.pose.position.z += 0.13;
-      //   objects_.push(obj);
-      //   objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
-      // }
-
       auto pose = moveit_control_->getGazeboModelPose("Book");
       if (pose.has_value())
       {
@@ -192,6 +180,28 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
   }
 
   return true;
+}
+
+void TaskHandler::objectPosesCallback(const task_handler::Objects::ConstPtr& msg)
+{
+  if (curr_state_ != State::READY_FOR_TASK)
+    return;
+
+  ROS_INFO_STREAM("Object poses received!");
+
+  std::queue<task_handler::Object> empty;
+  std::swap( objects_, empty );
+
+  for (const auto& obj : msg->objects)
+  {
+    ROS_INFO_STREAM("Adding " << obj.name << " to list");
+    objects_.push(obj);
+  }
+
+  curr_state_ = State::GO_TO_OBJECT;
+  state_str_.data = "Go to object";
+  state_pub_.publish(state_str_);
+  sendObjectGoal();
 }
 
 void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msg)
@@ -227,10 +237,10 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
             }
           }
 
-          // curr_state_ = State::GO_TO_OBJECT;
-          // state_str_.data = "Go to object";
-          // state_pub_.publish(state_str_);
-          // sendObjectGoal();
+          curr_state_ = State::GO_TO_OBJECT;
+          state_str_.data = "Go to object";
+          state_pub_.publish(state_str_);
+          sendObjectGoal();
         }
         break;
       case State::GO_TO_OBJECT:
@@ -256,28 +266,6 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
     task_str_.data = "Waiting for goal...";
     task_pub_.publish(task_str_);
   }
-}
-
-void TaskHandler::objectsCallback(const task_handler::Objects::ConstPtr& msg)
-{
-  if (curr_state_ != State::READY_FOR_TASK)
-    return;
-
-  ROS_INFO_STREAM("Object poses received!");
-  
-  std::queue<task_handler::Object> empty;
-  std::swap( objects_, empty );
-
-  for (const auto& obj : msg->objects)
-  {
-    ROS_INFO_STREAM("Adding " << obj.name << " to list");
-    objects_.push(obj);
-  }
-
-  curr_state_ = State::GO_TO_OBJECT;
-  state_str_.data = "Go to object";
-  state_pub_.publish(state_str_);
-  sendObjectGoal();
 }
 
 void TaskHandler::initLookups()

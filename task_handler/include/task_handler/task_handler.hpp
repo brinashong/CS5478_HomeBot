@@ -51,7 +51,6 @@ public:
   bool uiButtonCallback(task_handler::GoalTask::Request &req, task_handler::GoalTask::Response &res);
   void objectPosesCallback(const task_handler::Objects::ConstPtr& msg);
   void mbResultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msg);
-  void objectsCallback(const task_handler::Objects::ConstPtr& msg);
   void init();
 
 private:
@@ -63,7 +62,7 @@ private:
 
   ros::NodeHandle nh_;
   ros::Subscriber result_sub_;
-  ros::Subscriber objects_sub_;
+  ros::Subscriber object_poses_sub_;
   ros::Publisher cmd_vel_pub_;
   ros::Publisher state_pub_;
   ros::Publisher task_pub_;

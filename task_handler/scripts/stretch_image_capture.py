@@ -7,22 +7,14 @@ from cv_bridge import CvBridge, CvBridgeError
 import os
 from pathlib import Path
 import numpy as np
-
-
-#!/usr/bin/env python
-
-import rospy
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
 import message_filters
-import cv2
-import numpy as np
+
 
 class ImageSynchronizer:
     def __init__(self):
         self.bridge = CvBridge()
-        rospy.init_node('stretch_hello_image_capture', anonymous=True)
-        rospy.loginfo("begin capturing hello robot image...")
+        rospy.init_node('stretch_image_capture', anonymous=True)
+        rospy.loginfo("begin capturing robot image...")
 
         # set up image saving path
         self.image_depth_path = os.path.dirname(os.path.abspath(__file__)) + "/depth_images/"
@@ -47,15 +39,10 @@ class ImageSynchronizer:
             color_image = self.bridge.imgmsg_to_cv2(color_msg, "bgr8")
             depth_image = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")  # Assuming depth is in meters
         
-            # Process the depth image (example: normalize and visualize)
-            depth_array = np.array(depth_image, dtype=np.float32)
-            depth_array = np.nan_to_num(depth_array)
-
-            # optional: normalize the depth image
-            # normalized_depth = cv2.normalize(depth_array, None, 0, 255, cv2.NORM_MINMAX)
-            # depth_colormap = cv2.applyColorMap(normalized_depth.astype(np.uint8), cv2.COLORMAP_JET)
-
-            depth_colormap = cv2.applyColorMap(depth_array.astype(np.uint8), cv2.COLORMAP_JET)
+            # # optional: save colormap
+            # # normalized_depth = cv2.normalize(depth_array, None, 0, 255, cv2.NORM_MINMAX)
+            # # depth_colormap = cv2.applyColorMap(normalized_depth.astype(np.uint8), cv2.COLORMAP_JET)
+            # depth_colormap = cv2.applyColorMap(depth_array.astype(np.uint8), cv2.COLORMAP_JET)
 
             # Save the image (you can modify the path as needed)
             depth_image_name = "image_depth_" + str(self.image_index) + ".png"
@@ -70,7 +57,8 @@ class ImageSynchronizer:
                 os.remove(self.image_depth_path + "image_depth_" + str(oldest_file_index) + ".png")
                 self.stored_images_index.pop(0)
 
-            cv2.imwrite(self.image_depth_path + depth_image_name, depth_colormap)
+            cv2.imwrite(self.image_depth_path + depth_image_name, depth_image)
+            # cv2.imwrite(self.image_depth_path + depth_image_name, depth_colormap)
             cv2.imwrite(self.image_path + image_name, color_image)
             self.image_index += 1
 
@@ -78,9 +66,6 @@ class ImageSynchronizer:
             rospy.logerr(f"Image conversion failed: {e}")
             return
 
-        # Visualization (optional)
-        # cv2.imshow("Color Image", color_image)
-        # cv2.imshow("Depth Image", depth_image)
         cv2.waitKey(1)
 
 
@@ -97,7 +82,7 @@ class ImageSynchronizer:
                 rospy.loginfo("Clear up the image folder:" + img_path)
 
 def main():
-    rospy.init_node('stretch_hello_image_capture', anonymous=True)
+    rospy.init_node('stretch_image_capture', anonymous=True)
     rospy.loginfo("begin capturing hello robot image...")
 
     try:

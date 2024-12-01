@@ -9,22 +9,25 @@ import numpy as np
 from task_handler.srv import GetObjects, GetObjectsResponse
 import message_filters
 from task_handler.msg import Object, Objects
-from geometry_msgs.msg import Point, Quaternion, Pose, PointStamped
+from geometry_msgs.msg import Point, Quaternion, Pose
 import tf
 from ultralytics import YOLO
 from sensor_msgs.msg import CameraInfo, Image
 from gazebo_msgs.srv import GetModelState
-
-
+import sys
 
 class GetObjectsServer:
-    def __init__(self, yolo_model, camera_info, object_label):
+    def __init__(self, yolo_model, camera_info, object_label, camera_frame, world_frame, gt_objects_info):
         self.latest_color_image = None
         self.latest_depth_image = None      # cache the latest data
         self.cv_bridge = CvBridge()
-        self.yolo_object_detector = yolo_model
+        self.yolo_object_detector = yolo_model 
+
         self.camera_info = camera_info
         self.object_label = object_label
+        self.camera_frame = camera_frame
+        self.world_frame = world_frame
+        self.gt_objects_info = gt_objects_info
         self.output_img_index = 0
 
         # Subscribers for color and depth images
@@ -40,12 +43,13 @@ class GetObjectsServer:
 
     def data_callback(self, color_msg, depth_msg):
         # Update the cached message (image) from the topic
-        try:
-            # Convert messages to OpenCV images
-            self.latest_color_image = self.cv_bridge.imgmsg_to_cv2(color_msg, "bgr8")
-            self.latest_depth_image = self.cv_bridge.imgmsg_to_cv2(depth_msg, "32FC1")  # Assuming depth is in meters
-        except:
-            rospy.logerr("fail to convert image format to cv2 and cache them.")
+        self.color_msg = color_msg
+        self.depth_msg = depth_msg
+
+    def get_original_coordinates(self, x_rotated, y_rotated, original_image_height):
+        x_original = y_rotated
+        y_original = original_image_height - x_rotated - 1
+        return x_original, y_original
 
 
     def pixel_to_world(self, u, v, depth, camera_info, camera_frame, world_frame):
@@ -96,14 +100,28 @@ class GetObjectsServer:
 
 
     def handle_request(self, req):
-        if self.latest_color_image is None:
+        if self.color_msg is None:
             rospy.logwarn("No data received from /camera/color/image_raw yet!")
-            return GetObjectsResponse(None)
-
+            return None
         
         # the original image comes out sideways. Rotate it to upright
-        rgb_image = cv2.rotate(self.latest_color_image, cv2.ROTATE_90_CLOCKWISE)
-        results = self.yolo_object_detector.predict(rgb_image, save=True, conf=0.65, imgsz = 640)
+        try:
+            # Convert messages to OpenCV images
+            rgb_image = self.cv_bridge.imgmsg_to_cv2(self.color_msg, "bgr8")
+            depth_image = self.cv_bridge.imgmsg_to_cv2(self.depth_msg, "32FC1")  # Assuming depth is in meters
+        except:
+            rospy.logerr("fail to convert image format to cv2 and cache them.")
+            return None
+        
+        ori_height = rgb_image.shape[0]
+        rgb_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
+        depth_image = cv2.rotate(depth_image, cv2.ROTATE_90_CLOCKWISE)
+        results = self.yolo_object_detector.predict(rgb_image, save=True, conf=0.65)
+  
+        # save the tagged image
+        out_filename = os.path.join(imageOutputDir, "tagged_image_" + str(self.output_img_index) + ".jpg")
+        self.output_img_index += 1
+        results[0].save(out_filename)
 
         boxes = results[0].boxes
         obj_list = []
@@ -112,39 +130,29 @@ class GetObjectsServer:
         if len(boxes) > 0:
             for i, box in enumerate(boxes.xyxy.tolist()):
                 obj = Object()
-
                 x1, y1, x2, y2 = [int(item) for item in box]
 
                 # capture the target object label, and x centroid, y centroid position
                 class_id = int(boxes.cls[i])
-                
                 obj.name = self.object_label[class_id][1]
                 obj.id = self.object_label[class_id][0]
-              
-                x_center, y_center = int((x1 + x2) / 2), int((y1 + y2) / 2)
 
                 # if the class_id indicates Cup, Can or Book, store them in object_list
                 if class_id in [2, 3, 4]: 
-                    depth_image = cv2.rotate(self.latest_depth_image, cv2.ROTATE_90_CLOCKWISE)
-                    depth = depth_image[y_center, x_center]
+                    x_center, y_center = int((x1 + x2) / 2), int((y1 + y2) / 2)   
+                    depth = depth_image[y_center, x_center] / 1000
+
+                    # we need to find the point's coordinates in original un-rotated image to transform coordinates
+                    ori_x_center, ori_y_center = self.get_original_coordinates(x_center, y_center, ori_height)
 
                     # convert the location in camera to world coordinate
-                    world_coords = self.pixel_to_world(x_center, y_center, depth, self.camera_info, camera_frame, world_frame)
+                    world_coords = self.pixel_to_world(ori_x_center, ori_y_center, depth, self.camera_info, self.camera_frame, self.world_frame)
                     if world_coords is not None:
-                        rospy.loginfo("World coordinates: x=%f, y=%f, z=%f", *world_coords)
-                        # store in object
                         obj.pose = Pose(Point(*world_coords), Quaternion(0.0, 0.0, 0.0, 0.0))
                         obj_list.append(obj)
-    
-        # show the tagged image
-        out_filename = os.path.join(imageOutputDir, "tagged_image_" + str(self.output_img_index) + ".png")
-        results[0].save(out_filename)
-        self.output_img_index += 1
-        tagged_image = cv2.imread(out_filename)
-        cv2.imshow("Tagged Image", tagged_image)
-        cv2.waitKey(1)
-        
-   
+
+            rospy.loginfo("finish looping the boxes")
+
             # if you want to show the image in Rviz, uncomment the following line, and add ros_image to return value
             # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
 
@@ -153,7 +161,7 @@ class GetObjectsServer:
         rospy.loginfo("Finish processing, and response to client.")
 
         msg.objects = obj_list
-        return GetObjectsResponse(msg)
+        return GetObjectsResponse(msg, self.gt_objects_info, out_filename)
 
 # clean up the output directory before each running
 def cleanup_image_path(img_path):
@@ -163,7 +171,6 @@ def cleanup_image_path(img_path):
         for path in Path(img_path).glob("**/*"):
             if path.is_file():
                 path.unlink()
-                
         rospy.loginfo("Clear up the image folder:" + img_path)
 
 if __name__ == "__main__":
@@ -186,7 +193,10 @@ if __name__ == "__main__":
         world_frame = "map"
     except rospy.ROSException as e:
         rospy.logerr("Fail to retrieve camera info.")
+        sys.exit(-1)
 
+
+    gt_objects = Objects()
     gt_objects_info = []
     try: 
         for object_id, object_name in [("can", "Coke"), ("cup", 'Mug'), ("book", 'Book')]:
@@ -198,6 +208,7 @@ if __name__ == "__main__":
             gt_object.name = object_name
             gt_object.pose = response.pose
             gt_objects_info.append(gt_object)
+        gt_objects.objects = gt_objects_info
 
         if response.success:
             rospy.loginfo("Model_states received.")
@@ -208,7 +219,7 @@ if __name__ == "__main__":
     rospy.loginfo(gt_objects_info)
     print("")
 
-    # the recognized objects. Value represents (id, name) in Object.msg
+    # the recognized objects. Need this info to fill GetObjects.srv
     object_class_label = {0: ("table", "table"), 
                    1: ("rubbish_bin","rubbish_bin"),
                    2: ("book", "Book"),
@@ -216,7 +227,7 @@ if __name__ == "__main__":
                    4: ("cup", "Mug"),
                    5: ("book_shelf", "book_shelf")}
 
-    server = GetObjectsServer(yolo_object_detector, camera_info, object_class_label)
+    server = GetObjectsServer(yolo_object_detector, camera_info, object_class_label, camera_frame, world_frame, gt_objects)
     rospy.spin()
-
+    
 	
