@@ -1,6 +1,4 @@
 #include "task_handler/task_handler.hpp"
-#include "angles/angles.h"
-#include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Twist.h"
 #include "moveit_msgs/CollisionObject.h"
 #include "ros/init.h"
@@ -32,6 +30,7 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   );
 
   result_sub_ = nh_.subscribe<move_base_msgs::MoveBaseActionResult>("/move_base/result", 1, [this](const move_base_msgs::MoveBaseActionResult::ConstPtr& msg){ this->mbResultCallback(msg); });
+  objects_sub_ = nh_.subscribe<task_handler::Objects>("/objects_poses", 1, [this](const task_handler::Objects::ConstPtr& msg){ this->objectsCallback(msg); });
 
   cmd_vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/stretch_diff_drive_vcontroller/cmd_vel", 1);
   state_pub_ = nh_.advertise<std_msgs::String>("/homebot/state", 1);
@@ -136,9 +135,7 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
         obj.pose = pose.value();
         obj.pose.position.z += 0.07;
         objects_.push(obj);
-        std::cout << "obj pose: " << obj.pose << std::endl;
         auto res = getApproachPose(goal_pose, obj.pose);
-        std::cout << "app pose: " << res << std::endl;
         objects_approach_goals_.push(res);
       }
 
@@ -157,18 +154,18 @@ bool TaskHandler::uiButtonCallback(task_handler::GoalTask::Request &req, task_ha
     {
       auto goal_pose = zone_goal_map_[req.zone];
 
-      auto pose = moveit_control_->getGazeboModelPose("Book2");
-      if (pose.has_value())
-      {
-        obj.id = "book";
-        obj.name = "Book2";
-        obj.pose = pose.value();
-        obj.pose.position.z += 0.13;
-        objects_.push(obj);
-        objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
-      }
+      // auto pose = moveit_control_->getGazeboModelPose("Book2");
+      // if (pose.has_value())
+      // {
+      //   obj.id = "book";
+      //   obj.name = "Book2";
+      //   obj.pose = pose.value();
+      //   obj.pose.position.z += 0.13;
+      //   objects_.push(obj);
+      //   objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
+      // }
 
-      pose = moveit_control_->getGazeboModelPose("Book");
+      auto pose = moveit_control_->getGazeboModelPose("Book");
       if (pose.has_value())
       {
         obj.id = "book";
@@ -230,10 +227,10 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
             }
           }
 
-          curr_state_ = State::GO_TO_OBJECT;
-          state_str_.data = "Go to object";
-          state_pub_.publish(state_str_);
-          sendObjectGoal();
+          // curr_state_ = State::GO_TO_OBJECT;
+          // state_str_.data = "Go to object";
+          // state_pub_.publish(state_str_);
+          // sendObjectGoal();
         }
         break;
       case State::GO_TO_OBJECT:
@@ -261,13 +258,34 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
   }
 }
 
+void TaskHandler::objectsCallback(const task_handler::Objects::ConstPtr& msg)
+{
+  if (curr_state_ != State::READY_FOR_TASK)
+    return;
+
+  ROS_INFO_STREAM("Object poses received!");
+  
+  std::queue<task_handler::Object> empty;
+  std::swap( objects_, empty );
+
+  for (const auto& obj : msg->objects)
+  {
+    ROS_INFO_STREAM("Adding " << obj.name << " to list");
+    objects_.push(obj);
+  }
+
+  curr_state_ = State::GO_TO_OBJECT;
+  state_str_.data = "Go to object";
+  state_pub_.publish(state_str_);
+  sendObjectGoal();
+}
+
 void TaskHandler::initLookups()
 {
   /**
    * Object List
    ===========
    - Book
-   - Book2
    - Coke
    - Mug 
    */
@@ -292,15 +310,15 @@ void TaskHandler::initLookups()
   robot_target_map_["sink"] = pose;
 
   // book shelf position 1
-  pose.pose.position.x = 4.407;
-  pose.pose.position.y = -5.182;
-  pose.pose.position.z = 0.85;
-  pose.pose.orientation.w = 1.0;
-  object_location_map_["Book2"] = "book shelf";
-  object_target_map_["Book2"] = pose;
-  pose.pose.position.y = -4.64;
-  pose.pose.position.z = 0.0;
-  robot_target_map_["book shelf"] = pose;
+  // pose.pose.position.x = 4.407;
+  // pose.pose.position.y = -5.182;
+  // pose.pose.position.z = 0.85;
+  // pose.pose.orientation.w = 1.0;
+  // object_location_map_["Book2"] = "book shelf";
+  // object_target_map_["Book2"] = pose;
+  // pose.pose.position.y = -4.64;
+  // pose.pose.position.z = 0.0;
+  // robot_target_map_["book shelf"] = pose;
 
   // book shelf position 2
   pose.pose.position.x = 4.142;
