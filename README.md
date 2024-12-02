@@ -19,7 +19,7 @@ command line, type `pip install ultralytics`
     rosrun task_handler stretch_location_publisher.py
     ```
 
-    - If you just want to call /get_objects service when needed, replace the last two rosrun commands with:
+    - If you just want to call /get_objects service when needed, replace the last two rosrun commands with: <br>
 
     ```
     rosrun task_handler stretch_image_capture.py
@@ -35,12 +35,11 @@ command line, type `pip install ultralytics`
 There are two methods to get object information through camera. <br>
 
 1. Subscription:
-    - node stretch_image_capture will generate two folders under task_handler folder. </br>
+    - node `stretch_image_capture` will generate two folders under task_handler folder. </br>
         a. `images` folder - store RGB images </br>
         b. `depth_images` folder - store depth info of the RGB images (with the same index in file name). <br>
-        c. `output_images` folder - store the tagged images by the Yolo11 model. <br>
 
-        Note: Feel free to delete those images. If node `stretch_image_capture` did not identify the existence of those folders, it will create them automatically.
+        Note: Feel free to delete those images. If node `stretch_image_capture.py` did not identify the existence of those folders, it will create them automatically.
 
     - node `stretch_location_publisher` will publish the target objects pose info to the topic `objects_poses`. </br>
         - It will generate `output_images` folder. It stores tagged images with captured target objects after Yolo prediction. Each running, this folder will get cleaned up.
@@ -55,5 +54,5 @@ There are two methods to get object information through camera. <br>
     This folder contains Yolo8 retrained model by using around 400 images from the Small House environment.
 
     - Yolo11_retrained </br>
-    This folder contains Yolo11 retrained model. Same retraining process as Yolo8 retrained model. Compared to Yolo8 retrained model, its performance and precision both improve. We are using this model to identify objects.
+    This folder contains Yolo11 retrained model. Compared to Yolo8 retrained model, its performance and precision both improve. We are using this model to identify objects.
 
