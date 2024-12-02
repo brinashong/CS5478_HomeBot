@@ -56,3 +56,4 @@ There are two methods to get object information through camera. <br>
     - Yolo11_retrained </br>
     This folder contains Yolo11 retrained model. Compared to Yolo8 retrained model, its performance and precision both improve. We are using this model to identify objects.
 
+    - Training notebook, best model and test results of the Yolo model could be found [Google Drive link](https://drive.google.com/drive/folders/1LX2Mhq5g-VrV51M45szRoavj_GR6x6mt).
