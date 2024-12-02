@@ -195,7 +195,7 @@ if __name__ == "__main__":
         rospy.logerr("Fail to retrieve camera info.")
         sys.exit(-1)
 
-
+    # get ground truth
     gt_objects = Objects()
     gt_objects_info = []
     try: 
