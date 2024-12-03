@@ -1,6 +1,6 @@
 #!/bin/bash
 
-WSPATH="$HOME/ros1_ws/stretch_ws/devel/setup.zsh"
+WSPATH="$HOME/mcomp_ws/devel/setup.zsh"
 
 tmux has-session -t stretch_sim 2> /dev/null
 if [ $? != 0 ]; then
