@@ -43,7 +43,7 @@ catkin_make
     Replace the above with: rosrun task_handler stretch_identify_object_client.py
     ```
 
-Alternatively, if tmux is installed, modify `WSPATH` in stretch_sim.bash and run the script to start up the necessary nodes.
+Alternatively, if tmux is installed, modify `WSPATH` in `stretch_sim.bash` and run the script to start up the necessary nodes.
 
 # Useful Information</br>
 There are two methods to get object information through camera. <br>
