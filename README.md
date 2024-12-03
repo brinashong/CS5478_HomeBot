@@ -4,7 +4,7 @@
 ```
 mkdir ~/catkin_ws/src -p
 cd ~/catkin_ws/src
-git clone https://github.com/brinashong/CS5478_HomeBot.git
+git clone --recurse-submodules https://github.com/brinashong/CS5478_HomeBot.git
 cd ~/catkin_ws
 rosdep install --from-paths src --ignore-src -r -y
 catkin_make
