@@ -1,10 +1,22 @@
 # CS5478_HomeBot
 
-# Running Step </br>
-1. Install ultralytics to run Yolo model
-command line, type `pip install ultralytics`
+# Setup
+```
+mkdir ~/catkin_ws/src -p
+cd ~/catkin_ws/src
+git clone https://github.com/brinashong/CS5478_HomeBot.git
+cd ~/catkin_ws
+rosdep install --from-paths src --ignore-src -r -y
+catkin_make
+```
 
-2. Run the following commands in different Terminals.
+# Running </br>
+1. Install ultralytics to run Yolo model.
+    ```
+    pip install ultralytics
+    ```
+
+2. Source the catkin workspace and run the following commands in different terminals.
     ```
     roslaunch stretch_navigation navigation_gazebo_robotiq.launch
 
@@ -30,6 +42,8 @@ command line, type `pip install ultralytics`
 
     Replace the above with: rosrun task_handler stretch_identify_object_client.py
     ```
+
+Alternatively, if tmux is installed, modify `WSPATH` in stretch_sim.bash and run the script to start up the necessary nodes.
 
 # Useful Information</br>
 There are two methods to get object information through camera. <br>
