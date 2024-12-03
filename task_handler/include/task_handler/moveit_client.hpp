@@ -106,7 +106,7 @@ namespace moveit_control
 
     Eigen::Isometry3d poseMsgToEigen(const geometry_msgs::Pose& msg);
 
-    bool hoverArm(const geometry_msgs::PoseStamped& target_pose);
+    void hoverArm(const geometry_msgs::PoseStamped& target_pose);
 
     void approachArm(const geometry_msgs::PoseStamped& target_pose);
 

@@ -460,12 +460,12 @@ namespace moveit_control
     return approx_target;
   }
 
-  bool MoveItClient::hoverArm(const geometry_msgs::PoseStamped& target_pose)
+  void MoveItClient::hoverArm(const geometry_msgs::PoseStamped& target_pose)
   {
-    if (!initCheck()) return false;
+    if (!initCheck()) return;
 
     auto transformed_pose = getPoseInPlanningFrame(target_pose);
-    if (!transformed_pose.has_value()) return false;
+    if (!transformed_pose.has_value()) return ;
 
     transformed_pose->pose.position.z += 0.2;
 
@@ -492,8 +492,6 @@ namespace moveit_control
     moveJoints(joint_values);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    return true;
   }
 
   void MoveItClient::approachArm(const geometry_msgs::PoseStamped& target_pose)
