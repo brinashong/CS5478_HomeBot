@@ -37,7 +37,7 @@ TaskHandler::TaskHandler(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   goal_pub_ = nh_.advertise<visualization_msgs::Marker>("/homebot/goal", 1);
 
   reset_srv_client_ = nh_.serviceClient<std_srvs::SetBool>("/homebot/reset");
-  get_objects_srv_client_ = nh_.serviceClient<task_handler::GetObjects>("/object_poses");
+  get_objects_srv_client_ = nh_.serviceClient<task_handler::GetObjects>("/get_objects");
   goal_srv_server_ = nh.advertiseService("/homebot/goal_task", &TaskHandler::uiButtonCallback, this);
 
   ac_ = std::make_unique<actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>>("move_base", true);
@@ -189,19 +189,24 @@ void TaskHandler::objectPosesCallback(const task_handler::Objects::ConstPtr& msg
 
   ROS_INFO_STREAM("Object poses received!");
 
-  std::queue<task_handler::Object> empty;
-  std::swap( objects_, empty );
+  // use ground truth instead
 
-  for (const auto& obj : msg->objects)
-  {
-    ROS_INFO_STREAM("Adding " << obj.name << " to list");
-    objects_.push(obj);
-  }
+  // std::queue<task_handler::Object> empty;
+  // std::swap( objects_, empty );
+  // auto goal_pose = zone_goal_map_[curr_zone_];
+  //
+  // for (const auto& obj : msg->objects)
+  // {
+  //   ROS_INFO_STREAM("Adding " << obj.name << " to list");
+  //   objects_.push(obj);
+  //   auto res = getApproachPose(goal_pose, obj.pose);
+  //   objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
+  // }
 
-  curr_state_ = State::GO_TO_OBJECT;
-  state_str_.data = "Go to object";
-  state_pub_.publish(state_str_);
-  sendObjectGoal();
+  // curr_state_ = State::GO_TO_OBJECT;
+  // state_str_.data = "Go to object";
+  // state_pub_.publish(state_str_);
+  // sendObjectGoal();
 }
 
 void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msg)
@@ -225,18 +230,19 @@ void TaskHandler::mbResultCallback(const move_base_msgs::MoveBaseActionResult::C
           task_handler::GetObjects srv;
           if (get_objects_srv_client_.call(srv))
           {
-            std::queue<task_handler::Object> empty;
-            std::swap( objects_, empty );
-            auto goal_pose = zone_goal_map_[curr_zone_];
-            for (auto& obj : srv.response.objects.objects)
-            {
-              // obj.pose.position.z += 0.07; // varies for objects
-              objects_.push(obj);
-              auto res = getApproachPose(goal_pose, obj.pose);
-              objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
-            }
+            ROS_INFO("Object poses requested!");
+            // std::queue<task_handler::Object> empty;
+            // std::swap( objects_, empty );
+            // auto goal_pose = zone_goal_map_[curr_zone_];
+            // for (auto& obj : srv.response.objects.objects)
+            // {
+            //   objects_.push(obj);
+            //   auto res = getApproachPose(goal_pose, obj.pose);
+            //   objects_approach_goals_.push(getApproachPose(goal_pose, obj.pose));
+            // }
           }
 
+          // use ground truth instead
           curr_state_ = State::GO_TO_OBJECT;
           state_str_.data = "Go to object";
           state_pub_.publish(state_str_);
@@ -358,6 +364,12 @@ void TaskHandler::initLookups()
 
 void TaskHandler::sendObjectGoal()
 {
+  if (objects_.empty() || objects_approach_goals_.empty())
+  {
+    ROS_WARN("Objects empty!");
+    return;
+  }
+
   ROS_INFO_STREAM("Sending object goal");
 
   auto target_pose = objects_approach_goals_.front();

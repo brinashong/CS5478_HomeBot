@@ -157,11 +157,11 @@ class GetObjectsServer:
             # ros_image = bridge.cv2_to_imgmsg(tagged_image,encoding="bgr8")
 
         # temporarily for debugging purpose
+        msg.objects = obj_list
         print(msg)
         rospy.loginfo("Finish processing, and response to client.")
 
-        msg.objects = obj_list
-        return GetObjectsResponse(msg, self.gt_objects_info, out_filename)
+        return GetObjectsResponse(self.gt_objects_info, msg, out_filename)
 
 # clean up the output directory before each running
 def cleanup_image_path(img_path):
@@ -207,6 +207,12 @@ if __name__ == "__main__":
             gt_object.id = object_id 
             gt_object.name = object_name
             gt_object.pose = response.pose
+            if object_name == "Coke":
+                gt_object.pose.position.z += 0.07
+            elif object_name == "Mug":
+                gt_object.pose.position.z += 0.08
+            elif object_name == "Book":
+                gt_object.pose.position.z += 0.13
             gt_objects_info.append(gt_object)
         gt_objects.objects = gt_objects_info
 

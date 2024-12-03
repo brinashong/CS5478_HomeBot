@@ -139,7 +139,7 @@ def process_image(input_rgbimage_dir, input_depthimage_dir, output_dir):
             # store in output_images folder
             out_filename = os.path.join(output_dir, latest_file_short_name)
             results[0].save(out_filename)
-            msg.objects = obj_list
+            msg.real_objects = obj_list
             
             tagged_image = cv2.imread(out_filename)
             cv2.imshow("Tagged Image",tagged_image)
@@ -200,7 +200,7 @@ if __name__ == '__main__':
     try:
         rospy.init_node('stretch_object_location_publisher', anonymous=True)
         rospy.loginfo("begin sending object detection info...")
-        obj_pub = rospy.Publisher('/objects_poses', Objects, queue_size=100)
+        obj_pub = rospy.Publisher('/object_poses', Objects, queue_size=100)
 
         # if you want to show image in rviz, uncomment the following line to publish to the topic /sensor_msgs/Image
         # rviz_camera = rospy.Publisher("/sensor_msgs/Image", Image, queue_size=100)
@@ -217,12 +217,42 @@ if __name__ == '__main__':
         except rospy.ROSException as e:
             rospy.logerr("Fail to retrieve camera info.")
             sys.exit(-1)
+
+        # get ground truth
+        gt_objects_info = []
+        try: 
+            for object_id, object_name in [("can", "Coke"), ("cup", 'Mug'), ("book", 'Book')]:
+                rospy.loginfo("Getting the positions of objects in Gazebo.")
+                get_model_state = rospy.ServiceProxy("/gazebo/get_model_state", GetModelState)
+                response = get_model_state(model_name = object_name, relative_entity_name="world")
+                gt_object = Object()
+                gt_object.id = object_id 
+                gt_object.name = object_name
+                gt_object.pose = response.pose
+                if object_name == "Coke":
+                    gt_object.pose.position.z += 0.07
+                elif object_name == "Mug":
+                    gt_object.pose.position.z += 0.08
+                elif object_name == "Book":
+                    gt_object.pose.position.z += 0.13
+                gt_objects_info.append(gt_object)
+
+            if response.success:
+                rospy.loginfo("Model_states received.")
+        except rospy.ROSException as e:
+            rospy.logerr("Fail to retrieve model states.")
+
+        print("object ground truth:")
+        rospy.loginfo(gt_objects_info)
+        print("")
+
         
         # publish loop
         while not rospy.is_shutdown():
             msg = process_image(imageSaveDir, depthImageSaveDir, imageOutputDir)
 
             if msg is not None:
+                msg.objects = gt_objects_info
                 obj_pub.publish(msg)
                 # rviz_camera.publish(rviz_img)
 
